@@ -1,0 +1,640 @@
+scalar DateTime
+
+enum Role {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+enum SocialProvider {
+  GOOGLE
+  MICROSOFT
+}
+
+enum EquipmentType {
+  CLIMATIZATION
+  TRANSPORT
+  ELECTRICAL
+  HYDRAULIC
+  SECURITY
+  OTHER
+}
+
+enum EquipmentStatus {
+  ACTIVE
+  MAINTENANCE
+  ALERT
+  INACTIVE
+}
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+  PREDICTIVE
+}
+
+enum MaintenanceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  CANCELED
+}
+
+enum WarrantyType {
+  MANUFACTURER
+  SUPPLIER
+  EXTENDED
+  SERVICE
+}
+
+enum WarrantyStatus {
+  ACTIVE
+  EXPIRING
+  EXPIRED
+}
+
+enum ParkingSpotType {
+  STANDARD
+  ACCESSIBLE
+  MOTORCYCLE
+  SPECIAL
+}
+
+enum BrigadierRole {
+  BRIGADIER
+  CHIEF
+  DEPUTY_CHIEF
+}
+
+enum CertificationStatus {
+  VALID
+  EXPIRING
+  EXPIRED
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  SMS
+}
+
+enum NotificationDeliveryStatus {
+  SENT
+  FAILED
+}
+
+enum AppNotificationType {
+  MAINTENANCE_OVERDUE
+  MAINTENANCE_PENDING
+  WARRANTY_EXPIRING
+  WARRANTY_EXPIRED
+}
+
+enum NotificationSeverity {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+type PageInfo {
+  total: Int!
+  page: Int!
+  pageSize: Int!
+  totalPages: Int!
+}
+
+interface Node {
+  id: ID!
+}
+
+interface Auditable {
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdBy: String
+}
+
+type Condominium implements Node & Auditable {
+  id: ID!
+  name: String!
+  cnpj: String!
+  address: String!
+  timezone: String!
+  active: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdBy: String
+}
+
+type CondominiumUser implements Node & Auditable {
+  id: ID!
+  userId: ID!
+  condominiumId: ID!
+  condominium: Condominium!
+  name: String!
+  email: String!
+  role: Role!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdBy: String
+}
+
+type User implements Node {
+  id: ID!
+  name: String!
+  email: String!
+  role: Role!
+  avatar: String
+  condominiumId: ID
+  condominiumName: String
+  condominiums: [Condominium!]!
+}
+
+type AuthResponse {
+  user: User!
+  token: String!
+  refreshToken: String
+  requiresCondominiumSelection: Boolean!
+}
+
+type Equipment implements Node & Auditable {
+  id: ID!
+  condominiumId: ID!
+  name: String!
+  type: EquipmentType!
+  typeLabel: String!
+  brand: String!
+  model: String!
+  serialNumber: String!
+  patrimonyCode: String!
+  location: String!
+  status: EquipmentStatus!
+  statusLabel: String!
+  acquisitionDate: DateTime!
+  warrantyExpiry: DateTime!
+  lastMaintenance: DateTime
+  nextMaintenance: DateTime!
+  value: Float!
+  deletedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdBy: String
+}
+
+type EquipmentPage {
+  data: [Equipment!]!
+  pageInfo: PageInfo!
+}
+
+type MaintenanceRecord implements Node & Auditable {
+  id: ID!
+  condominiumId: ID!
+  equipment: String!
+  equipmentId: ID
+  type: MaintenanceType!
+  typeLabel: String!
+  status: MaintenanceStatus!
+  statusLabel: String!
+  scheduledDate: DateTime!
+  completedDate: DateTime
+  technician: String
+  provider: String
+  description: String!
+  cost: Float
+  observations: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdBy: String
+}
+
+type MaintenancePage {
+  data: [MaintenanceRecord!]!
+  pageInfo: PageInfo!
+}
+
+type Warranty implements Node & Auditable {
+  id: ID!
+  condominiumId: ID!
+  equipment: String!
+  equipmentId: ID
+  brand: String!
+  model: String!
+  serialNumber: String
+  supplier: String!
+  supplierContact: String
+  purchaseDate: DateTime!
+  warrantyStart: DateTime!
+  warrantyEnd: DateTime!
+  warrantyMonths: Int!
+  type: WarrantyType!
+  typeLabel: String!
+  status: WarrantyStatus!
+  statusLabel: String!
+  observations: String
+  documentUrl: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdBy: String
+}
+
+type WarrantyUploadUrl {
+  uploadUrl: String!
+  documentUrl: String!
+  expiresAt: DateTime!
+  maxBytes: Int!
+  acceptedMimeTypes: [String!]!
+}
+
+type WarrantyPage {
+  data: [Warranty!]!
+  pageInfo: PageInfo!
+}
+
+type Apartment implements Node & Auditable {
+  id: ID!
+  condominiumId: ID!
+  unit: String!
+  block: String!
+  ownerName: String!
+  phone: String!
+  email: String
+  floor: Int!
+  hasVehicle: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdBy: String
+}
+
+type ParkingSpot implements Node & Auditable {
+  id: ID!
+  condominiumId: ID!
+  number: String!
+  type: ParkingSpotType!
+  typeLabel: String!
+  covered: Boolean!
+  floor: String!
+  assignedTo: ID
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdBy: String
+}
+
+type LotteryResult implements Node & Auditable {
+  id: ID!
+  apartmentId: ID!
+  spotId: ID!
+  unit: String!
+  block: String!
+  ownerName: String!
+  spotNumber: String!
+  spotType: ParkingSpotType!
+  spotTypeLabel: String!
+  seed: Int!
+  drawnAt: DateTime!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdBy: String
+}
+
+type LotterySession implements Node & Auditable {
+  id: ID!
+  condominiumId: ID!
+  seed: Int!
+  drawnAt: DateTime!
+  results: [LotteryResult!]!
+  undrawnApartments: [Apartment!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdBy: String
+}
+
+type Brigadier implements Node & Auditable {
+  id: ID!
+  condominiumId: ID!
+  name: String!
+  apartment: String!
+  block: String!
+  phone: String!
+  role: BrigadierRole!
+  roleLabel: String!
+  certificationDate: DateTime!
+  certificationExpiry: DateTime!
+  certificationBody: String!
+  certificationStatus: CertificationStatus!
+  active: Boolean!
+  observations: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdBy: String
+}
+
+type NotificationLog implements Node & Auditable {
+  id: ID!
+  condominiumId: ID!
+  channel: NotificationChannel!
+  recipients: [String!]!
+  message: String!
+  sentAt: DateTime!
+  status: NotificationDeliveryStatus!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  createdBy: String
+}
+
+type AppNotification implements Node {
+  id: ID!
+  condominiumId: ID!
+  userId: ID!
+  type: AppNotificationType!
+  title: String!
+  description: String!
+  severity: NotificationSeverity!
+  date: DateTime
+  read: Boolean!
+}
+
+input PaginationInput {
+  page: Int = 1
+  pageSize: Int = 20
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+input SocialLoginInput {
+  provider: SocialProvider!
+  authorizationCode: String!
+  redirectUri: String!
+}
+
+input CreateCondominiumInput {
+  name: String!
+  cnpj: String!
+  address: String!
+  timezone: String = "America/Sao_Paulo"
+}
+
+input UpdateCondominiumInput {
+  name: String
+  cnpj: String
+  address: String
+  timezone: String
+  active: Boolean
+}
+
+input CondominiumUserInput {
+  userId: ID!
+  name: String!
+  email: String!
+  role: Role!
+}
+
+input EquipmentFilters {
+  search: String
+  type: EquipmentType
+  status: EquipmentStatus
+  includeDeleted: Boolean = false
+}
+
+input CreateEquipmentInput {
+  name: String!
+  type: EquipmentType!
+  brand: String!
+  model: String!
+  serialNumber: String!
+  location: String!
+  status: EquipmentStatus = ACTIVE
+  acquisitionDate: DateTime!
+  warrantyExpiry: DateTime!
+  nextMaintenance: DateTime!
+  value: Float!
+}
+
+input UpdateEquipmentInput {
+  name: String
+  type: EquipmentType
+  brand: String
+  model: String
+  serialNumber: String
+  location: String
+  status: EquipmentStatus
+  acquisitionDate: DateTime
+  warrantyExpiry: DateTime
+  nextMaintenance: DateTime
+  value: Float
+}
+
+input MaintenanceFilters {
+  search: String
+  type: MaintenanceType
+  status: MaintenanceStatus
+}
+
+input CreateMaintenanceInput {
+  equipment: String!
+  equipmentId: ID
+  type: MaintenanceType!
+  scheduledDate: DateTime!
+  technician: String
+  provider: String
+  description: String!
+}
+
+input UpdateMaintenanceInput {
+  equipment: String
+  equipmentId: ID
+  type: MaintenanceType
+  scheduledDate: DateTime
+  technician: String
+  provider: String
+  description: String
+}
+
+input CompleteMaintenanceInput {
+  completedDate: DateTime!
+  cost: Float
+  observations: String
+}
+
+input WarrantyFilters {
+  search: String
+  type: WarrantyType
+  status: WarrantyStatus
+}
+
+input CreateWarrantyInput {
+  equipment: String!
+  equipmentId: ID
+  brand: String!
+  model: String!
+  serialNumber: String
+  supplier: String!
+  supplierContact: String
+  purchaseDate: DateTime!
+  warrantyStart: DateTime!
+  warrantyEnd: DateTime!
+  warrantyMonths: Int
+  type: WarrantyType!
+  observations: String
+}
+
+input UpdateWarrantyInput {
+  equipment: String
+  equipmentId: ID
+  brand: String
+  model: String
+  serialNumber: String
+  supplier: String
+  supplierContact: String
+  purchaseDate: DateTime
+  warrantyStart: DateTime
+  warrantyEnd: DateTime
+  warrantyMonths: Int
+  type: WarrantyType
+  observations: String
+}
+
+input WarrantyUploadInput {
+  fileName: String!
+  contentType: String!
+  size: Int!
+}
+
+input CreateApartmentInput {
+  unit: String!
+  block: String!
+  ownerName: String!
+  phone: String!
+  email: String
+  floor: Int!
+  hasVehicle: Boolean!
+}
+
+input UpdateApartmentInput {
+  unit: String
+  block: String
+  ownerName: String
+  phone: String
+  email: String
+  floor: Int
+  hasVehicle: Boolean
+}
+
+input CreateParkingSpotInput {
+  number: String!
+  type: ParkingSpotType!
+  covered: Boolean!
+  floor: String!
+}
+
+input UpdateParkingSpotInput {
+  number: String
+  type: ParkingSpotType
+  covered: Boolean
+  floor: String
+}
+
+input ExecuteLotteryInput {
+  seed: Int
+}
+
+input BrigadierFilters {
+  search: String
+  role: BrigadierRole
+  status: CertificationStatus
+  active: Boolean
+}
+
+input CreateBrigadierInput {
+  name: String!
+  apartment: String!
+  block: String!
+  phone: String!
+  role: BrigadierRole!
+  certificationDate: DateTime!
+  certificationExpiry: DateTime!
+  certificationBody: String!
+  active: Boolean!
+  observations: String
+}
+
+input UpdateBrigadierInput {
+  name: String
+  apartment: String
+  block: String
+  phone: String
+  role: BrigadierRole
+  certificationDate: DateTime
+  certificationExpiry: DateTime
+  certificationBody: String
+  active: Boolean
+  observations: String
+}
+
+input NotifyBrigadiersInput {
+  channel: NotificationChannel!
+  recipientIds: [ID!]!
+  message: String!
+}
+
+type Query {
+  me: User!
+  condominiums: [Condominium!]!
+  condominium(id: ID!): Condominium
+  condominiumUsers(condominiumId: ID!): [CondominiumUser!]!
+  equipments(filters: EquipmentFilters, pagination: PaginationInput): EquipmentPage!
+  equipment(id: ID!): Equipment
+  maintenances(filters: MaintenanceFilters, pagination: PaginationInput): MaintenancePage!
+  maintenance(id: ID!): MaintenanceRecord
+  warranties(filters: WarrantyFilters, pagination: PaginationInput): WarrantyPage!
+  warranty(id: ID!): Warranty
+  parkingApartments: [Apartment!]!
+  parkingSpots: [ParkingSpot!]!
+  parkingResults: [LotteryResult!]!
+  lotterySessions: [LotterySession!]!
+  brigadiers(filters: BrigadierFilters): [Brigadier!]!
+  brigadier(id: ID!): Brigadier
+  notificationLogs: [NotificationLog!]!
+  notifications: [AppNotification!]!
+}
+
+type Mutation {
+  login(input: LoginInput!): AuthResponse!
+  socialLogin(input: SocialLoginInput!): AuthResponse!
+  refresh: AuthResponse!
+  logout: Boolean!
+  switchCondominium(condominiumId: ID!): AuthResponse!
+  createCondominium(input: CreateCondominiumInput!): Condominium!
+  updateCondominium(id: ID!, input: UpdateCondominiumInput!): Condominium!
+  deleteCondominium(id: ID!): Boolean!
+  addCondominiumUser(condominiumId: ID!, input: CondominiumUserInput!): CondominiumUser!
+  removeCondominiumUser(condominiumId: ID!, userId: ID!): Boolean!
+  createEquipment(input: CreateEquipmentInput!): Equipment!
+  updateEquipment(id: ID!, input: UpdateEquipmentInput!): Equipment!
+  deleteEquipment(id: ID!): Boolean!
+  createMaintenance(input: CreateMaintenanceInput!): MaintenanceRecord!
+  updateMaintenance(id: ID!, input: UpdateMaintenanceInput!): MaintenanceRecord!
+  completeMaintenance(id: ID!, input: CompleteMaintenanceInput!): MaintenanceRecord!
+  deleteMaintenance(id: ID!): Boolean!
+  createWarranty(input: CreateWarrantyInput!): Warranty!
+  updateWarranty(id: ID!, input: UpdateWarrantyInput!): Warranty!
+  deleteWarranty(id: ID!): Boolean!
+  warrantyUploadUrl(warrantyId: ID!, input: WarrantyUploadInput!): WarrantyUploadUrl!
+  confirmWarrantyUpload(warrantyId: ID!, documentUrl: String!): Warranty!
+  createParkingApartment(input: CreateApartmentInput!): Apartment!
+  updateParkingApartment(id: ID!, input: UpdateApartmentInput!): Apartment!
+  deleteParkingApartment(id: ID!): Boolean!
+  createParkingSpot(input: CreateParkingSpotInput!): ParkingSpot!
+  updateParkingSpot(id: ID!, input: UpdateParkingSpotInput!): ParkingSpot!
+  deleteParkingSpot(id: ID!): Boolean!
+  executeLottery(input: ExecuteLotteryInput): LotterySession!
+  resetLottery: Boolean!
+  createBrigadier(input: CreateBrigadierInput!): Brigadier!
+  updateBrigadier(id: ID!, input: UpdateBrigadierInput!): Brigadier!
+  deleteBrigadier(id: ID!): Boolean!
+  notifyBrigadiers(input: NotifyBrigadiersInput!): NotificationLog!
+  markNotificationRead(id: ID!): AppNotification!
+  markAllNotificationsRead: [AppNotification!]!
+  deleteNotification(id: ID!): Boolean!
+}

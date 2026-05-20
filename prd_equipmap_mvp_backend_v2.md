@@ -17,12 +17,26 @@ references:
 
 - **Sistema/produto**: EquipMap — aplicação web para gestão de condomínios residenciais, com foco em equipamentos, manutenções, garantias, sorteio de vagas de garagem, brigadistas e notificações operacionais. O frontend já está definido com React 18, TypeScript, Tailwind CSS v4, Vite, Radix UI/shadcn, motion/react, recharts e lucide-react.
 - **Stack tecnológica**:
-  - **Frontend**: React 18 + TypeScript + Vite
-  - **BFF (Backend for Frontend)**: Node.js + GraphQL — ponto único de entrada do frontend; orquestra chamadas aos microserviços, aplica autenticação e resolve queries/mutations
-  - **Backend (microserviços)**: Java 21 (LTS) + Spring Boot, Spring Data JPA + Hibernate, **PostgreSQL** (um database/schema por serviço), **RabbitMQ** como message broker (Spring AMQP), **MinIO** (S3-compatible) para storage de documentos
-  - **Comunicação BFF → microserviços**: REST (HTTP)
-  - **Infraestrutura**: agnóstica de cloud provider, Docker Compose para desenvolvimento local
-- **Estado atual**: o frontend segue o padrão Repository + Service Layer, com separação entre configuração de API, contratos TypeScript, services, hooks, contexts e páginas. A variável `VITE_API_BASE_URL` controla o modo de execução: quando vazia, o frontend usa dados mockados; quando preenchida, deve consumir o BFF GraphQL. Os contratos de dados esperados estão centralizados em `src/types/`. Existem 8 domínios de backend identificados como microserviços independentes: `auth-service`, `condominium-service`, `equipment-service`, `maintenance-service`, `warranty-service`, `parking-service`, `brigadier-service` e `notification-service`.
+  - **Frontend**: React 18 + TypeScript + Vite + Apollo Client + `graphql-codegen` (types gerados a partir do schema GraphQL do BFF)
+  - **BFF (Backend for Frontend)**: Node.js + Apollo Server (GraphQL) — ponto único de entrada do frontend; orquestra chamadas aos microserviços, aplica autenticação, resolve queries/mutations e mapeia enums
+  - **Backend (microserviços)**: Java 21 (LTS) + Spring Boot + **Gradle** (Kotlin DSL), Spring Data JPA + Hibernate, **PostgreSQL** (um database por serviço), **RabbitMQ** como message broker (Spring AMQP), **MinIO** (S3-compatible) para storage de documentos
+  - **Shared lib**: `equipmap-core` — DTOs de eventos, interfaces (StorageService, MessagingProvider), error handling, constantes. Publicado via Maven registry (GitHub Packages) + Gradle composite build para dev local
+  - **Comunicação BFF → microserviços**: REST (HTTP), documentada via OpenAPI
+  - **Infraestrutura**: agnóstica de cloud provider, Docker Compose **por microserviço** (cada repo autossuficiente), configuração via variáveis de ambiente (12-factor)
+- **Repositórios** (12 repos isolados):
+  - `fe-equipmap` — Frontend React + TypeScript (existente)
+  - `bff-equipmap` — BFF Node.js + Apollo Server (GraphQL)
+  - `auth-service` — Autenticação/autorização (Java/Spring Boot)
+  - `condominium-service` — Gestão de condomínios (Java/Spring Boot)
+  - `equipment-service` — Inventário de equipamentos (Java/Spring Boot)
+  - `maintenance-service` — Manutenções (Java/Spring Boot)
+  - `warranty-service` — Garantias + documentos (Java/Spring Boot)
+  - `parking-service` — Sorteio de vagas (Java/Spring Boot)
+  - `brigadier-service` — Brigadistas + comunicação (Java/Spring Boot)
+  - `notification-service` — Alertas internos (Java/Spring Boot)
+  - `equipmap-core` — Shared lib Java (DTOs, interfaces, constantes)
+  - `equipmap-infra` — Docker Compose de integração + IaC
+- **Estado atual**: o frontend segue o padrão Repository + Service Layer, com separação entre configuração de API, contratos TypeScript, services, hooks, contexts e páginas. A variável `VITE_API_BASE_URL` controla o modo de execução: quando vazia, o frontend usa dados mockados; quando preenchida, deve consumir o BFF GraphQL. Os contratos de dados atuais estão em `src/types/` e servirão como **blueprint** para o schema GraphQL; após a migração, serão **substituídos por types gerados via `graphql-codegen`**. Existem 8 domínios de backend identificados como microserviços independentes: `auth-service`, `condominium-service`, `equipment-service`, `maintenance-service`, `warranty-service`, `parking-service`, `brigadier-service` e `notification-service`.
 - **Multi-tenancy**: um usuário/proprietário pode possuir apartamentos em condomínios diferentes que utilizam o EquipMap. O `condominiumId` ativo é vinculado ao JWT (claim assinado), selecionado pós-login e trocável via mutation dedicada.
 - **Problema**: a aplicação possui uma experiência frontend definida, mas ainda depende de dados locais/mockados. Sem backend real, o EquipMap não consegue operar em ambiente produtivo, persistir dados por condomínio, aplicar autenticação/autorização, executar regras de negócio automáticas, controlar histórico operacional nem gerar notificações confiáveis. Os principais afetados são síndicos, administradores de condomínio, equipes de manutenção, brigadistas e gestores operacionais.
 - **Impacto de não resolver**: a gestão de ativos, manutenções, garantias e comunicações continuará fragmentada em planilhas, controles manuais ou ferramentas desconectadas, aumentando o risco de manutenção vencida, perda de garantia, inconsistência em sorteios de vagas, falha de comunicação com brigadistas e ausência de rastreabilidade operacional.
@@ -53,6 +67,16 @@ Este PRD descreve a entrega do MVP backend integrado ao frontend existente, pres
 8. **Seed registrado no sorteio de vagas.** Motivo: resultado reprodutível e auditável matematicamente.
 9. **Infraestrutura cloud-agnostic.** Motivo: containers Docker puros, abstrações de storage (S3-compatible via MinIO/AWS/GCP/DO Spaces) e configuração por variáveis de ambiente.
 10. **Formato de erro RFC 7807 simplificado.** Motivo: padroniza resposta de erro com `statusCode`, `error`, `message`, `details`, `timestamp` e `traceId`.
+11. **Gradle (Kotlin DSL) como build tool para todos os projetos Java.** Motivo: builds mais rápidos, DSL type-safe, melhor suporte a composite builds para dev local com `equipmap-core`.
+12. **12 repositórios independentes (não monorepo).** Motivo: deploy independente, ownership claro, pipelines isoladas, liberdade de versionamento por serviço.
+13. **`equipmap-core` como shared lib publicada via Maven registry (GitHub Packages).** Motivo: DTOs de eventos, interfaces e constantes compartilhadas sem acoplamento; Gradle composite build para iteração rápida em dev local.
+14. **Docker Compose por microserviço (autossuficiente).** Motivo: cada repo sobe com `docker compose up` sem depender de repositório externo; inclui suas dependências (Postgres, RabbitMQ, etc.).
+15. **Contract tests em dev, integração real somente em staging.** Motivo: rapidez no ciclo de dev (mocks/stubs) com validação de integração real antes de release.
+16. **`graphql-codegen` no frontend (schema como source of truth).** Motivo: elimina tipos manuais em `src/types/`; garante sincronia frontend↔BFF; gera hooks tipados para Apollo Client.
+17. **Admin global = usuário com role `admin` em todos os condomínios (sem flag superuser).** Motivo: modelo uniforme RBAC; admin global é consequência da associação, não de campo especial.
+18. **Enums limpos no GraphQL + mapping no BFF.** Motivo: type-safety sobre conveniência; enums sem acentos/espaços; BFF mapeia para labels legíveis quando necessário.
+19. **Seed data via migration script (1 admin + 1 condomínio).** Motivo: bootstrap mínimo para primeiro login sem necessidade de setup manual.
+20. **Ajustes frontend distribuídos nos milestones (não milestone separado).** Motivo: cada milestone entrega ponta a ponta; frontend evolui junto com o backend correspondente.
 
 ### Fora do escopo
 
@@ -64,6 +88,7 @@ Este PRD descreve a entrega do MVP backend integrado ao frontend existente, pres
 - Migração de dados legados. Motivo: não foram fornecidas fontes, formatos ou regras de saneamento.
 - Integrações definitivas com fornecedores específicos de WhatsApp/SMS. Motivo: interface de provider abstraída; implementação com provedor real fora do MVP.
 - Fila de espera para sorteio de vagas. Motivo: funcionalidade futura; no MVP apenas registro de quem ficou de fora.
+- Monorepo. Motivo: optou-se por 12 repos independentes para deploy isolado e ownership claro.
 
 ## 3. Funcionalidades
 
@@ -505,15 +530,21 @@ Integrações externas:
 
 **Funcionalidades:** US01, US02, US09
 
-- [ ] Definir estrutura de monorepo com BFF (Node.js/GraphQL) e microserviços Spring Boot.
+- [ ] Criar repositórios: `bff-equipmap`, `auth-service`, `condominium-service`, `equipmap-core`, `equipmap-infra`.
+- [ ] Configurar Gradle (Kotlin DSL) para `auth-service`, `condominium-service` e `equipmap-core`.
+- [ ] Implementar `equipmap-core` com DTOs de eventos, interfaces base e publicação via GitHub Packages.
 - [ ] Implementar BFF com Apollo Server, validação JWT, rate limiting, CORS e schema GraphQL base.
 - [ ] Implementar `auth-service` (Spring Boot) com login, refresh (httpOnly cookie + rotação), logout, `GET /auth/me` e `POST /auth/switch-condominium`.
 - [ ] Implementar RBAC com Spring Security para `admin`, `manager` e `viewer`.
 - [ ] Implementar `condominium-service` (Spring Boot) com CRUD e associação de usuários.
-- [ ] Configurar consumo do BFF pelo frontend via `VITE_API_BASE_URL`.
-- [ ] Criar Docker Compose com PostgreSQL, RabbitMQ e MinIO.
+- [ ] Criar seed data via Flyway migration: 1 admin + 1 condomínio.
+- [ ] Criar Docker Compose por serviço (autossuficiente) + `equipmap-infra` para orquestração.
 - [ ] Criar documentação OpenAPI para endpoints REST internos.
-- [ ] Criar schema GraphQL com tipos base e mutations de auth.
+- [ ] Criar schema GraphQL com tipos base, enums limpos e mutations de auth.
+- [ ] **Frontend:** Configurar Apollo Client + `graphql-codegen` no `fe-equipmap`.
+- [ ] **Frontend:** Migrar `AuthContext` para consumir mutations GraphQL do BFF.
+- [ ] **Frontend:** Implementar tela de seleção de condomínio (pós-login, multi-tenancy).
+- [ ] **Frontend:** Remover types manuais de auth/condominium em `src/types/` (substituídos por codegen).
 
 **Critério de conclusão:**
 - Condição: usuário consegue autenticar via GraphQL, selecionar condomínio, obter token com claim `condominiumId` e acessar query protegida via frontend configurado para BFF.
@@ -533,6 +564,8 @@ Integrações externas:
 - [ ] Implementar conclusão de manutenção via `PATCH /maintenance/:id/complete` com optimistic locking (`@Version`).
 - [ ] Publicar e consumir evento `maintenance.completed` (Spring AMQP) para atualizar `lastMaintenance`.
 - [ ] Implementar job de marcação de manutenções atrasadas (`@Scheduled`, idempotente, timezone-aware).
+- [ ] **Frontend:** Migrar hooks `useEquipment` e `useMaintenance` para Apollo Client (queries/mutations GraphQL).
+- [ ] **Frontend:** Remover types manuais de equipment/maintenance em `src/types/` (substituídos por codegen).
 - [ ] Expor queries e mutations de equipamento e manutenção no BFF.
 
 **Critério de conclusão:**
@@ -554,6 +587,8 @@ Integrações externas:
 - [ ] Implementar deduplicação por chave `type + resourceId + userId + condominiumId`.
 - [ ] Implementar job diário de garantias vencendo/vencidas (`@Scheduled`, idempotente, timezone-aware).
 - [ ] Expor queries e mutations de garantias e notificações no BFF.
+- [ ] **Frontend:** Migrar hooks `useWarranty` para Apollo Client.
+- [ ] **Frontend:** Integrar `NotificationContext` com queries GraphQL do `notification-service`.
 
 **Critério de conclusão:**
 - Condição: garantias vencendo e manutenções atrasadas geram notificações com severidade correta para o usuário do condomínio, sem duplicatas.
@@ -573,6 +608,7 @@ Integrações externas:
 - [ ] Implementar reset de sorteio com controle de permissão (`admin` only).
 - [ ] Implementar tratamento de excedente (apt > vagas → sorteio parcial).
 - [ ] Expor queries e mutations de parking no BFF.
+- [ ] **Frontend:** Migrar hook `useParking` para Apollo Client; adaptar para novo tipo `LotterySession`.
 
 **Critério de conclusão:**
 - Condição: administrador consegue cadastrar apartamentos/vagas, executar sorteio reprodutível, visualizar resultados e verificar excedentes.
@@ -593,6 +629,7 @@ Integrações externas:
 - [ ] Implementar retry via dead-letter queue.
 - [ ] Filtro silencioso de brigadistas inativos no envio.
 - [ ] Expor queries e mutations de brigadistas no BFF.
+- [ ] **Frontend:** Migrar hook `useBrigadiers` para Apollo Client.
 
 **Critério de conclusão:**
 - Condição: gestor consegue selecionar brigadistas, enviar mensagem e consultar log com status por destinatário.
@@ -634,6 +671,8 @@ Integrações externas:
 | Exposição indevida de dados entre condomínios. | Alto | `condominiumId` no claim JWT (não manipulável); testes obrigatórios de isolamento; logs de tentativa cross-tenant. | Pendente |
 | Complexidade operacional de múltiplos databases PostgreSQL. | Médio | Docker Compose padronizado para dev; Flyway ou Liquibase para migrations versionadas. | Monitorando |
 | Latência adicional introduzida pelo BFF como intermediário. | Baixo | BFF faz chamadas paralelas via DataLoader quando possível; monitorar p95 em homologação. | Monitorando |
+| Coordenação entre 12 repos independentes. | Médio | Versionamento semântico de `equipmap-core`; contract tests em pipelines; documentação centralizada em `equipmap-infra`. | Monitorando |
+| `equipmap-core` como ponto de acoplamento entre serviços. | Médio | Manter lib minimal (DTOs de eventos + interfaces); evitar regras de negócio; versionamento com compatibilidade retroativa. | Monitorando |
 
 **Dependências:**
 
@@ -680,3 +719,14 @@ Integrações externas:
 - **2026-05-18:** Exclusão de notificação é lógica e pessoal (apenas para o usuário autenticado). Motivo: notificações são pessoais; cada usuário gerencia as suas.
 - **2026-05-18:** Refresh token em httpOnly cookie com rotação a cada uso. Motivo: mitigar XSS (token não acessível via JS) e detectar roubo (reuso de token rotacionado revoga família).
 - **2026-05-19:** Stack atualizada — microserviços em Java 21 + Spring Boot (Spring Data JPA, Spring AMQP, Spring Security), BFF em Node.js + GraphQL (Apollo Server), frontend em React + TypeScript. Motivo: Java/Spring para robustez enterprise e virtual threads; BFF GraphQL para flexibilidade de consultas e isolamento do frontend da topologia de microserviços; comunicação BFF → serviços via REST.
+- **2026-05-19:** Gradle (Kotlin DSL) como build tool para todos os projetos Java. Motivo: builds mais rápidos, DSL type-safe, melhor suporte a composite builds para dev local com `equipmap-core`.
+- **2026-05-19:** 12 repositórios independentes (não monorepo). Motivo: deploy independente, ownership claro, pipelines isoladas, liberdade de versionamento por serviço.
+- **2026-05-19:** `equipmap-core` como shared lib publicada via GitHub Packages + Gradle composite build local. Motivo: compartilhar DTOs de eventos e interfaces sem acoplamento; iteração rápida em dev.
+- **2026-05-19:** Docker Compose por microserviço (autossuficiente). Motivo: cada repo sobe independente sem depender de repo externo.
+- **2026-05-19:** Contract tests em dev, integração real somente em staging. Motivo: rapidez no ciclo de dev com validação real antes de release.
+- **2026-05-19:** `graphql-codegen` no frontend como source of truth. Motivo: elimina types manuais; garante sincronia frontend↔BFF.
+- **2026-05-19:** Admin global = usuário com role `admin` em todos os condomínios. Motivo: modelo uniforme RBAC sem flag especial.
+- **2026-05-19:** Enums limpos no GraphQL + mapping no BFF. Motivo: type-safety; enums sem acentos/espaços no schema.
+- **2026-05-19:** Seed data via Flyway migration (1 admin + 1 condomínio). Motivo: bootstrap mínimo para primeiro login.
+- **2026-05-19:** Ajustes frontend distribuídos nos milestones. Motivo: cada milestone entrega ponta a ponta.
+- **2026-05-19:** Entidades JPA modeladas: User, RefreshToken, Condominium, CondominiumUser, Equipment, OutboxEvent, MaintenanceRecord, Apartment, ParkingSpot, LotterySession, LotteryResult, Brigadier, NotificationLog. Motivo: design validado durante exploração arquitetural.

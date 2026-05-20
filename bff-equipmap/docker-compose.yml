@@ -1,0 +1,15 @@
+services:
+  bff-equipmap:
+    build: .
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      GRAPHQL_PATH: /graphql
+      FRONTEND_ORIGIN: http://localhost:5173
+      JWT_SECRET: dev-secret-change-me
+      MOCK_MODE: "true"
+      RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX_BY_IP: 120
+      RATE_LIMIT_MAX_BY_USER: 240

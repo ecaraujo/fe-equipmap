@@ -1,0 +1,42 @@
+server:
+  port: ${SERVER_PORT:8087}
+
+spring:
+  application:
+    name: brigadier-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5439/brigadier_service}
+    username: ${SPRING_DATASOURCE_USERNAME:brigadier_service}
+    password: ${SPRING_DATASOURCE_PASSWORD:brigadier_service}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5676}
+    username: ${SPRING_RABBITMQ_USERNAME:brigadier_service}
+    password: ${SPRING_RABBITMQ_PASSWORD:brigadier_service}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+equipmap:
+  messaging:
+    provider: ${EQUIPMAP_MESSAGING_PROVIDER:}
+  brigadier:
+    certification-expiring-window-days: ${BRIGADIER_CERTIFICATION_EXPIRING_WINDOW_DAYS:90}
+    max-retry-attempts: ${BRIGADIER_MAX_RETRY_ATTEMPTS:3}

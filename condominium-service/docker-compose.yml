@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: equipmap-condominium-postgres
+    environment:
+      POSTGRES_DB: condominium_service
+      POSTGRES_USER: condominium_service
+      POSTGRES_PASSWORD: condominium_service
+    ports:
+      - "5434:5432"
+    volumes:
+      - condominium_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U condominium_service -d condominium_service"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  condominium-service:
+    build:
+      context: ..
+      dockerfile: condominium-service/Dockerfile
+    container_name: equipmap-condominium-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/condominium_service
+      SPRING_DATASOURCE_USERNAME: condominium_service
+      SPRING_DATASOURCE_PASSWORD: condominium_service
+    ports:
+      - "8082:8082"
+
+volumes:
+  condominium_postgres_data:

@@ -1,0 +1,36 @@
+server:
+  port: ${SERVER_PORT:8082}
+
+spring:
+  application:
+    name: condominium-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5434/condominium_service}
+    username: ${SPRING_DATASOURCE_USERNAME:condominium_service}
+    password: ${SPRING_DATASOURCE_PASSWORD:condominium_service}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    placeholders:
+      equipmap.condominium.seed.id: ${CONDOMINIUM_SEED_ID:11111111-1111-1111-1111-111111111111}
+      equipmap.condominium.seed.name: ${CONDOMINIUM_SEED_NAME:Residencial Park EquipMap}
+      equipmap.condominium.seed.cnpj: ${CONDOMINIUM_SEED_CNPJ:12345678000199}
+      equipmap.condominium.seed.address: ${CONDOMINIUM_SEED_ADDRESS:Rua das Acacias, 100}
+      equipmap.condominium.seed.timezone: ${CONDOMINIUM_SEED_TIMEZONE:America/Sao_Paulo}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

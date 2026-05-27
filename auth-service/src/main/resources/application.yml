@@ -1,0 +1,64 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/auth_service}
+    username: ${SPRING_DATASOURCE_USERNAME:auth_service}
+    password: ${SPRING_DATASOURCE_PASSWORD:auth_service}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    placeholders:
+      equipmap.auth.seed.admin-email: ${AUTH_SEED_ADMIN_EMAIL:admin@equipmap.local}
+      equipmap.auth.seed.condominium-id: ${AUTH_SEED_CONDOMINIUM_ID:11111111-1111-1111-1111-111111111111}
+      equipmap.auth.seed.condominium-name: ${AUTH_SEED_CONDOMINIUM_NAME:Residencial Park EquipMap}
+      equipmap.auth.seed.condominium-cnpj: ${AUTH_SEED_CONDOMINIUM_CNPJ:12345678000199}
+      equipmap.auth.seed.condominium-address: ${AUTH_SEED_CONDOMINIUM_ADDRESS:Rua das Acacias, 100}
+      equipmap.auth.seed.condominium-timezone: ${AUTH_SEED_CONDOMINIUM_TIMEZONE:America/Sao_Paulo}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+equipmap:
+  auth:
+    jwt:
+      issuer: ${AUTH_JWT_ISSUER:equipmap-auth-service}
+      secret: ${AUTH_JWT_SECRET:dev-only-change-me-dev-only-change-me-dev-only-change-me}
+      access-token-minutes: ${AUTH_ACCESS_TOKEN_MINUTES:15}
+    refresh-token-days: ${AUTH_REFRESH_TOKEN_DAYS:7}
+    cookie:
+      name: ${AUTH_REFRESH_COOKIE_NAME:equipmap_refresh_token}
+      secure: ${AUTH_REFRESH_COOKIE_SECURE:false}
+      same-site: ${AUTH_REFRESH_COOKIE_SAME_SITE:Strict}
+    seed:
+      admin-email: ${AUTH_SEED_ADMIN_EMAIL:admin@equipmap.local}
+      admin-password: ${AUTH_SEED_ADMIN_PASSWORD:admin123}
+      condominium-id: ${AUTH_SEED_CONDOMINIUM_ID:11111111-1111-1111-1111-111111111111}
+      condominium-name: ${AUTH_SEED_CONDOMINIUM_NAME:Residencial Park EquipMap}
+      condominium-cnpj: ${AUTH_SEED_CONDOMINIUM_CNPJ:12345678000199}
+      condominium-address: ${AUTH_SEED_CONDOMINIUM_ADDRESS:Rua das Acacias, 100}
+      condominium-timezone: ${AUTH_SEED_CONDOMINIUM_TIMEZONE:America/Sao_Paulo}
+    oauth:
+      google:
+        client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
+        client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
+      microsoft:
+        client-id: ${MICROSOFT_OAUTH_CLIENT_ID:}
+        client-secret: ${MICROSOFT_OAUTH_CLIENT_SECRET:}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

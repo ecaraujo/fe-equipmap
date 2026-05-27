@@ -3,13 +3,8 @@ import {
   Building2,
   LayoutDashboard,
   Package,
-  MapPin,
   Wrench,
   Shield,
-  FileText,
-  QrCode,
-  BarChart3,
-  CheckSquare,
   LogOut,
   ChevronDown,
   Bell,
@@ -25,7 +20,6 @@ import {
   ShieldOff,
   ShieldAlert,
 } from "lucide-react";
-import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import {
   DropdownMenu,
@@ -38,18 +32,14 @@ import { ScrollArea } from "./ui/scroll-area";
 import { cn } from "./ui/utils";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNotifications } from "../../contexts/NotificationContext";
-import type { AppNotification } from "../../types";
+import { useDashboardSummaryQuery } from "../../graphql/generated";
+import type { AppNotification } from "../../graphql/models";
 
 type Page =
   | "dashboard"
   | "inventory"
-  | "locations"
   | "maintenance"
   | "warranties"
-  | "checklists"
-  | "documents"
-  | "qrcodes"
-  | "reports"
   | "parking"
   | "brigadiers";
 
@@ -64,9 +54,8 @@ const navItems = [
     section: "Principal",
     items: [
       { id: "dashboard" as Page, label: "Dashboard", icon: LayoutDashboard },
-      { id: "inventory" as Page, label: "Inventário", icon: Package, badge: 248 },
-      { id: "locations" as Page, label: "Locais", icon: MapPin },
-      { id: "maintenance" as Page, label: "Manutenções", icon: Wrench, badge: 18, badgeVariant: "destructive" as const },
+      { id: "inventory" as Page, label: "Inventário", icon: Package },
+      { id: "maintenance" as Page, label: "Manutenções", icon: Wrench },
       { id: "warranties" as Page, label: "Garantias", icon: Shield },
     ],
   },
@@ -75,10 +64,6 @@ const navItems = [
     items: [
       { id: "parking" as Page, label: "Sorteio de Vagas", icon: Car },
       { id: "brigadiers" as Page, label: "Brigadistas", icon: ShieldCheck },
-      { id: "checklists" as Page, label: "Checklists", icon: CheckSquare },
-      { id: "documents" as Page, label: "Documentos", icon: FileText },
-      { id: "qrcodes" as Page, label: "QR Codes", icon: QrCode },
-      { id: "reports" as Page, label: "Relatórios", icon: BarChart3 },
     ],
   },
 ];
@@ -101,12 +86,23 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { data: dashboardData } = useDashboardSummaryQuery({ errorPolicy: "all" });
 
   const maintenanceNotifs = notifications.filter((n) => n.type === "maintenance_overdue" || n.type === "maintenance_pending");
   const warrantyNotifs = notifications.filter((n) => n.type === "warranty_expired" || n.type === "warranty_expiring");
 
   const markAllRead = markAllAsRead;
   const onLogout = logout;
+  const selectedCondominiumName =
+    user?.condominiumName ??
+    user?.condominiums?.find((condominium) => condominium.id === user.condominiumId)?.name ??
+    dashboardData?.dashboardSummary.condominiumName ??
+    "Condominio";
+  const navBadges: Partial<Record<Page, number>> = {
+    inventory: dashboardData?.dashboardSummary.equipmentTotal,
+    maintenance: dashboardData?.dashboardSummary.maintenancePendingTotal,
+    warranties: dashboardData?.dashboardSummary.warrantyExpiringTotal,
+  };
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -137,7 +133,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
         <div className="px-3 py-3 border-b border-gray-100">
           <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors">
             <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
-            <span className="text-sm font-medium text-blue-900 truncate flex-1 text-left">Residencial Park</span>
+            <span className="text-sm font-medium text-blue-900 truncate flex-1 text-left">{selectedCondominiumName}</span>
             <ChevronDown className="w-4 h-4 text-blue-500 shrink-0" />
           </button>
         </div>
@@ -152,6 +148,8 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = currentPage === item.id;
+                  const badge = navBadges[item.id];
+                  const badgeVariant = item.id === "maintenance" || item.id === "warranties" ? "destructive" : "secondary";
                   return (
                     <button
                       key={item.id}
@@ -163,15 +161,15 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                     >
                       <Icon className="w-4 h-4 shrink-0" />
                       <span className="flex-1 text-left">{item.label}</span>
-                      {item.badge && (
+                      {badge !== undefined && (
                         <Badge
-                          variant={item.badgeVariant ?? "secondary"}
+                          variant={badgeVariant}
                           className={cn(
                             "text-xs h-5 px-1.5",
-                            isActive && item.badgeVariant !== "destructive" && "bg-blue-600 text-white border-blue-600"
+                            isActive && badgeVariant !== "destructive" && "bg-blue-600 text-white border-blue-600"
                           )}
                         >
-                          {item.badge}
+                          {badge}
                         </Badge>
                       )}
                     </button>

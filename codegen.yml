@@ -1,0 +1,21 @@
+schema: ./bff-equipmap/schema.graphql
+documents: ./src/graphql/operations.graphql
+generates:
+  ./src/graphql/generated.tsx:
+    plugins:
+      - typescript-operations
+      - typescript-react-apollo
+    config:
+      withHooks: true
+      withComponent: false
+      withHOC: false
+      apolloReactHooksImportFrom: "@apollo/client/react"
+      scalars:
+        DateTime: string
+      maybeValue: T | null
+      preResolveTypes: false
+      avoidOptionals:
+        field: true
+        inputValue: false
+        object: true
+      enumsAsTypes: false

@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -44,7 +45,7 @@ import type {
   UpdateApartmentDto,
   CreateSpotDto,
   UpdateSpotDto,
-} from "../../types";
+} from "../../graphql/models";
 
 const spotTypeColors: Record<string, string> = {
   "Padrão": "bg-blue-100 text-blue-700 border-blue-200",
@@ -76,21 +77,33 @@ export function ParkingLotteryPage() {
   const [showSpotModal, setShowSpotModal] = useState(false);
   const [editingApt, setEditingApt] = useState<Apartment | null>(null);
   const [editingSpot, setEditingSpot] = useState<ParkingSpot | null>(null);
-  const [newApt, setNewApt] = useState<Partial<CreateApartmentDto>>({ hasVehicle: true, floor: 1, block: "A" });
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [newApt, setNewApt] = useState<Partial<CreateApartmentDto>>({ hasVehicle: true, block: "A" });
   const [newSpot, setNewSpot] = useState<Partial<CreateSpotDto>>({ type: "Padrão", covered: false });
 
   const eligibleApts = apartments.filter((a) => a.hasVehicle && !results.find((r) => r.apartmentId === a.id));
   const availableSpots = spots.filter((s) => !results.find((r) => r.spotId === s.id));
 
   const handleRunLottery = async () => {
-    await runLotteryService();
-    setShowLotteryModal(false);
-    setActiveTab("results");
+    if (results.length > 0 || isRunningLottery) return;
+    setActionError(null);
+    try {
+      await runLotteryService();
+      setShowLotteryModal(false);
+      setActiveTab("results");
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Nao foi possivel realizar o sorteio.");
+    }
   };
 
   const handleResetLottery = async () => {
-    await resetLotteryService();
-    setActiveTab("results");
+    setActionError(null);
+    try {
+      await resetLotteryService();
+      setActiveTab("results");
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Nao foi possivel resetar o sorteio.");
+    }
   };
 
   const handleSaveApt = async () => {
@@ -101,7 +114,7 @@ export function ParkingLotteryPage() {
     }
     setShowAptModal(false);
     setEditingApt(null);
-    setNewApt({ hasVehicle: true, floor: 1, block: "A" });
+    setNewApt({ hasVehicle: true, block: "A" });
   };
 
   const handleSaveSpot = async () => {
@@ -142,13 +155,19 @@ export function ParkingLotteryPage() {
           <Button
             size="sm"
             className="bg-blue-700 hover:bg-blue-800 text-white gap-2"
-            onClick={() => setShowLotteryModal(true)}
-            disabled={eligibleApts.length === 0 || availableSpots.length === 0}
+            onClick={() => { setActionError(null); setShowLotteryModal(true); }}
+            disabled={results.length > 0 || eligibleApts.length === 0 || availableSpots.length === 0 || isRunningLottery}
           >
             <Shuffle className="w-4 h-4" /> Realizar sorteio
           </Button>
         </div>
       </div>
+
+      {actionError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {actionError}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -198,7 +217,7 @@ export function ParkingLotteryPage() {
                 <Input placeholder="Buscar..." className="pl-8 h-8 text-sm w-48" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
               {activeTab === "apartments" && (
-                <Button size="sm" className="h-8 bg-blue-700 hover:bg-blue-800 text-white gap-1.5" onClick={() => { setEditingApt(null); setNewApt({ hasVehicle: true, floor: 1, block: "A" }); setShowAptModal(true); }}>
+                <Button size="sm" className="h-8 bg-blue-700 hover:bg-blue-800 text-white gap-1.5" onClick={() => { setEditingApt(null); setNewApt({ hasVehicle: true, block: "A" }); setShowAptModal(true); }}>
                   <Plus className="w-3.5 h-3.5" /> Apartamento
                 </Button>
               )}
@@ -250,11 +269,11 @@ export function ParkingLotteryPage() {
                         <td className="px-5 py-3.5 hidden sm:table-cell">
                           <div className="flex items-center gap-1.5 text-sm text-gray-600">
                             <Phone className="w-3.5 h-3.5 text-gray-400" />
-                            {apt.phone}
+                            {apt.phone ?? "Nao informado"}
                           </div>
                         </td>
                         <td className="px-5 py-3.5 hidden md:table-cell">
-                          <span className="text-sm text-gray-600">{apt.floor}º andar</span>
+                          <span className="text-sm text-gray-600">{apt.floor != null ? `${apt.floor}º andar` : "Nao informado"}</span>
                         </td>
                         <td className="px-5 py-3.5">
                           <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border", apt.hasVehicle ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200")}>
@@ -374,8 +393,8 @@ export function ParkingLotteryPage() {
                 <p className="text-sm mt-1">Cadastre os apartamentos e vagas, depois realize o sorteio</p>
                 <Button
                   className="mt-4 bg-blue-700 hover:bg-blue-800 text-white gap-2"
-                  onClick={() => setShowLotteryModal(true)}
-                  disabled={eligibleApts.length === 0 || availableSpots.length === 0}
+                  onClick={() => { setActionError(null); setShowLotteryModal(true); }}
+                  disabled={results.length > 0 || eligibleApts.length === 0 || availableSpots.length === 0 || isRunningLottery}
                 >
                   <Shuffle className="w-4 h-4" /> Realizar sorteio agora
                 </Button>
@@ -457,6 +476,9 @@ export function ParkingLotteryPage() {
               <Shuffle className="w-5 h-5 text-blue-600" />
               Confirmar sorteio
             </DialogTitle>
+            <DialogDescription>
+              Revise os participantes e confirme a geracao de resultados para as vagas disponiveis.
+            </DialogDescription>
           </DialogHeader>
           {isRunningLottery ? (
             <div className="flex flex-col items-center py-8 gap-4">
@@ -494,7 +516,7 @@ export function ParkingLotteryPage() {
               </div>
               <DialogFooter className="mt-4">
                 <Button variant="outline" onClick={() => setShowLotteryModal(false)}>Cancelar</Button>
-                <Button className="bg-blue-700 hover:bg-blue-800 text-white gap-2" onClick={handleRunLottery}>
+                <Button className="bg-blue-700 hover:bg-blue-800 text-white gap-2" onClick={handleRunLottery} disabled={results.length > 0 || isRunningLottery}>
                   <Shuffle className="w-4 h-4" /> Sortear agora
                 </Button>
               </DialogFooter>
@@ -508,9 +530,12 @@ export function ParkingLotteryPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingApt ? "Editar apartamento" : "Cadastrar apartamento"}</DialogTitle>
+            <DialogDescription>
+              Informe os dados operacionais usados pelo sorteio de vagas.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Unidade *</Label>
                 <Input placeholder="101" defaultValue={editingApt?.unit} onChange={(e) => setNewApt({ ...newApt, unit: e.target.value })} />
@@ -519,24 +544,10 @@ export function ParkingLotteryPage() {
                 <Label>Bloco</Label>
                 <Input placeholder="A" defaultValue={editingApt?.block || "A"} onChange={(e) => setNewApt({ ...newApt, block: e.target.value })} />
               </div>
-              <div className="space-y-1.5">
-                <Label>Andar</Label>
-                <Input type="number" placeholder="1" defaultValue={editingApt?.floor} onChange={(e) => setNewApt({ ...newApt, floor: Number(e.target.value) })} />
-              </div>
             </div>
             <div className="space-y-1.5">
               <Label>Responsável *</Label>
               <Input placeholder="Nome completo" defaultValue={editingApt?.ownerName} onChange={(e) => setNewApt({ ...newApt, ownerName: e.target.value })} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Telefone *</Label>
-                <Input placeholder="(11) 99999-0000" defaultValue={editingApt?.phone} onChange={(e) => setNewApt({ ...newApt, phone: e.target.value })} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>E-mail</Label>
-                <Input placeholder="email@ex.com" defaultValue={editingApt?.email} onChange={(e) => setNewApt({ ...newApt, email: e.target.value })} />
-              </div>
             </div>
             <div className="space-y-1.5">
               <Label>Possui veículo?</Label>
@@ -561,6 +572,9 @@ export function ParkingLotteryPage() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>{editingSpot ? "Editar vaga" : "Cadastrar vaga"}</DialogTitle>
+            <DialogDescription>
+              Configure a vaga disponivel para os sorteios do condominio.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="grid grid-cols-2 gap-3">

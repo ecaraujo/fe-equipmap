@@ -5,7 +5,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Separator } from "./ui/separator";
 import { useAuth } from "../../contexts/AuthContext";
-import type { SocialProvider } from "../../types";
+import type { SocialProvider } from "../../graphql/models";
 
 export function LoginPage() {
   const { login, loginWithSocial, isLoading } = useAuth();
@@ -34,7 +34,6 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 flex-col items-center justify-center p-12 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -59,27 +58,17 @@ export function LoginPage() {
             <span className="text-3xl font-semibold tracking-tight">EquipMap</span>
           </div>
           <h1 className="text-4xl font-bold mb-4 leading-tight">
-            Plataforma de Gestão Predial e Patrimonial
+            Plataforma de Gestao Predial e Patrimonial
           </h1>
           <p className="text-blue-200 text-lg leading-relaxed">
-            Controle equipamentos, patrimônio, manutenções e garantias em um único lugar.
+            Controle equipamentos, patrimonio, manutencoes e garantias em um unico lugar.
           </p>
-          <div className="mt-10 grid grid-cols-3 gap-4">
-            {[
-              { label: "Equipamentos", value: "2.4k+" },
-              { label: "Condomínios", value: "180+" },
-              { label: "Manutenções", value: "98%" },
-            ].map((stat) => (
-              <div key={stat.label} className="bg-white/10 rounded-xl p-4 backdrop-blur-sm">
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <div className="text-blue-200 text-sm mt-1">{stat.label}</div>
-              </div>
-            ))}
+          <div className="mt-10 text-blue-100 text-sm leading-relaxed">
+            Acesse os dados do seu condominio com uma conta cadastrada pela administracao.
           </div>
         </div>
       </div>
 
-      {/* Right panel */}
       <div className="flex-1 flex items-center justify-center p-8 bg-gray-50">
         <div className="w-full max-w-md">
           <div className="flex lg:hidden items-center justify-center gap-2 mb-8">
@@ -109,7 +98,7 @@ export function LoginPage() {
                 onClick={() => handleSocialLogin("google")}
               >
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <GoogleIcon />}
-                <span>Continuar com Google</span>
+                <span>Google indisponivel</span>
               </Button>
               <Button
                 variant="outline"
@@ -118,7 +107,7 @@ export function LoginPage() {
                 onClick={() => handleSocialLogin("microsoft")}
               >
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MicrosoftIcon />}
-                <span>Continuar com Microsoft</span>
+                <span>Microsoft indisponivel</span>
               </Button>
             </div>
 
@@ -156,7 +145,7 @@ export function LoginPage() {
                   <Input
                     id="password"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder="********"
                     className="pl-10"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -175,7 +164,7 @@ export function LoginPage() {
             </form>
 
             <p className="text-center text-sm text-gray-500 mt-6">
-              Não tem uma conta?{" "}
+              Nao tem uma conta?{" "}
               <button className="text-blue-600 hover:text-blue-700 font-medium">
                 Solicitar acesso
               </button>

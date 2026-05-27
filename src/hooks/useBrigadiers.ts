@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
-import { brigadierService } from "../services/brigadier.service";
-import type {
-  Brigadier,
-  NotificationLog,
-  CreateBrigadierDto,
-  UpdateBrigadierDto,
-  SendNotificationDto,
-} from "../types";
+import { useCallback, useState } from "react";
+import {
+  useBrigadiersQuery,
+  useCreateBrigadierMutation,
+  useDeleteBrigadierMutation,
+  useNotifyBrigadiersMutation,
+  useUpdateBrigadierMutation,
+} from "../graphql/generated";
+import { toCreateBrigadierInput, toNotifyBrigadiersInput, toUpdateBrigadierInput } from "../graphql/inputs";
+import { mapBrigadier, mapNotificationLog } from "../graphql/mappers";
+import type { Brigadier, CreateBrigadierDto, NotificationLog, SendNotificationDto, UpdateBrigadierDto } from "../graphql/models";
 
 export interface UseBrigadiersReturn {
   brigadiers: Brigadier[];
@@ -21,53 +23,47 @@ export interface UseBrigadiersReturn {
 }
 
 export function useBrigadiers(): UseBrigadiersReturn {
-  const [brigadiers, setBrigadiers] = useState<Brigadier[]>([]);
-  const [logs, setLogs] = useState<NotificationLog[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const { data, loading, error, refetch } = useBrigadiersQuery({
+    variables: { filters: { search: query || undefined } },
+  });
+  const [createBrigadier] = useCreateBrigadierMutation();
+  const [updateBrigadier] = useUpdateBrigadierMutation();
+  const [deleteBrigadier] = useDeleteBrigadierMutation();
+  const [notifyBrigadiers] = useNotifyBrigadiersMutation();
 
-  const fetchAll = useCallback(async (query?: string) => {
-    setIsLoading(true);
-    try {
-      const [brs, ls] = await Promise.all([
-        brigadierService.findAll(query),
-        brigadierService.getNotificationLogs(),
-      ]);
-      setBrigadiers(brs);
-      setLogs(ls);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const create = useCallback(async (dto: CreateBrigadierDto) => {
+    const result = await createBrigadier({ variables: { input: toCreateBrigadierInput(dto) } });
+    await refetch();
+    return mapBrigadier(result.data!.createBrigadier);
+  }, [createBrigadier, refetch]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  const update = useCallback(async (id: string, dto: UpdateBrigadierDto) => {
+    const result = await updateBrigadier({ variables: { id, input: toUpdateBrigadierInput(dto) } });
+    await refetch();
+    return mapBrigadier(result.data!.updateBrigadier);
+  }, [refetch, updateBrigadier]);
 
-  const create = useCallback(async (dto: CreateBrigadierDto): Promise<Brigadier> => {
-    const created = await brigadierService.create(dto);
-    setBrigadiers((prev) => [...prev, created]);
-    return created;
-  }, []);
+  const remove = useCallback(async (id: string) => {
+    await deleteBrigadier({ variables: { id } });
+    await refetch();
+  }, [deleteBrigadier, refetch]);
 
-  const update = useCallback(async (id: string, dto: UpdateBrigadierDto): Promise<Brigadier> => {
-    const updated = await brigadierService.update(id, dto);
-    setBrigadiers((prev) => prev.map((b) => (b.id === id ? updated : b)));
-    return updated;
-  }, []);
+  const sendNotification = useCallback(async (dto: SendNotificationDto) => {
+    const result = await notifyBrigadiers({ variables: { input: toNotifyBrigadiersInput(dto) } });
+    await refetch();
+    return mapNotificationLog(result.data!.notifyBrigadiers);
+  }, [notifyBrigadiers, refetch]);
 
-  const remove = useCallback(async (id: string): Promise<void> => {
-    await brigadierService.remove(id);
-    setBrigadiers((prev) => prev.filter((b) => b.id !== id));
-  }, []);
-
-  const sendNotification = useCallback(async (dto: SendNotificationDto): Promise<NotificationLog> => {
-    const log = await brigadierService.sendNotification(dto);
-    setLogs((prev) => [log, ...prev]);
-    return log;
-  }, []);
-
-  const search = useCallback((query: string) => { fetchAll(query); }, [fetchAll]);
-
-  return { brigadiers, logs, isLoading, error, create, update, remove, sendNotification, search };
+  return {
+    brigadiers: data?.brigadiers.map(mapBrigadier) ?? [],
+    logs: data?.notificationLogs.map(mapNotificationLog) ?? [],
+    isLoading: loading,
+    error: error?.message ?? null,
+    create,
+    update,
+    remove,
+    sendNotification,
+    search: setQuery,
+  };
 }

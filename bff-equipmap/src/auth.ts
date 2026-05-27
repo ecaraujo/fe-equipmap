@@ -7,6 +7,7 @@ export interface AuthClaims {
   userId: string;
   role: Role;
   condominiumId: string;
+  token?: string;
 }
 
 interface JwtPayload extends jwt.JwtPayload {
@@ -18,15 +19,13 @@ interface JwtPayload extends jwt.JwtPayload {
 export function signAccessToken(claims: AuthClaims): string {
   return jwt.sign(claims, config.jwtSecret, {
     expiresIn: "15m",
-    issuer: "equipmap-bff",
-    audience: "equipmap-frontend",
+    issuer: config.jwtIssuer,
   });
 }
 
 export function verifyAccessToken(token: string): AuthClaims {
   const payload = jwt.verify(token, config.jwtSecret, {
-    issuer: "equipmap-bff",
-    audience: "equipmap-frontend",
+    issuer: config.jwtIssuer,
   }) as JwtPayload;
 
   if (!payload.userId || !payload.role || !payload.condominiumId) {
@@ -37,6 +36,7 @@ export function verifyAccessToken(token: string): AuthClaims {
     userId: payload.userId,
     role: payload.role,
     condominiumId: payload.condominiumId,
+    token,
   };
 }
 

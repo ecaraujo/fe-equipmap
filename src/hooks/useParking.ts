@@ -1,14 +1,18 @@
-import { useState, useEffect, useCallback } from "react";
-import { parkingService } from "../services/parking.service";
-import type {
-  Apartment,
-  ParkingSpot,
-  LotteryResult,
-  CreateApartmentDto,
-  UpdateApartmentDto,
-  CreateSpotDto,
-  UpdateSpotDto,
-} from "../types";
+import { useCallback, useMemo } from "react";
+import {
+  useCreateParkingApartmentMutation,
+  useCreateParkingSpotMutation,
+  useDeleteParkingApartmentMutation,
+  useDeleteParkingSpotMutation,
+  useExecuteLotteryMutation,
+  useParkingDataQuery,
+  useResetLotteryMutation,
+  useUpdateParkingApartmentMutation,
+  useUpdateParkingSpotMutation,
+} from "../graphql/generated";
+import { toCreateApartmentInput, toCreateSpotInput, toUpdateApartmentInput, toUpdateSpotInput } from "../graphql/inputs";
+import { mapApartment, mapLotteryResult, mapSpot } from "../graphql/mappers";
+import type { Apartment, CreateApartmentDto, CreateSpotDto, LotteryResult, ParkingSpot, UpdateApartmentDto, UpdateSpotDto } from "../graphql/models";
 
 export interface UseParkingReturn {
   apartments: Apartment[];
@@ -28,81 +32,76 @@ export interface UseParkingReturn {
 }
 
 export function useParking(): UseParkingReturn {
-  const [apartments, setApartments] = useState<Apartment[]>([]);
-  const [spots, setSpots] = useState<ParkingSpot[]>([]);
-  const [results, setResults] = useState<LotteryResult[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRunningLottery, setIsRunningLottery] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, refetch } = useParkingDataQuery();
+  const [createApartmentMutation] = useCreateParkingApartmentMutation();
+  const [updateApartmentMutation] = useUpdateParkingApartmentMutation();
+  const [deleteApartmentMutation] = useDeleteParkingApartmentMutation();
+  const [createSpotMutation] = useCreateParkingSpotMutation();
+  const [updateSpotMutation] = useUpdateParkingSpotMutation();
+  const [deleteSpotMutation] = useDeleteParkingSpotMutation();
+  const [executeLottery, { loading: isRunningLottery }] = useExecuteLotteryMutation();
+  const [resetLotteryMutation] = useResetLotteryMutation();
 
-  useEffect(() => {
-    setIsLoading(true);
-    Promise.all([
-      parkingService.findAllApartments(),
-      parkingService.findAllSpots(),
-      parkingService.getLotteryResults(),
-    ])
-      .then(([apts, spts, res]) => {
-        setApartments(apts);
-        setSpots(spts);
-        setResults(res);
-      })
-      .catch((err) => setError((err as Error).message))
-      .finally(() => setIsLoading(false));
-  }, []);
+  const realData = useMemo(() => ({
+    apartments: data?.parkingApartments.map(mapApartment) ?? [],
+    spots: data?.parkingSpots.map(mapSpot) ?? [],
+    results: data?.parkingResults.map(mapLotteryResult) ?? [],
+  }), [data]);
 
   const createApartment = useCallback(async (dto: CreateApartmentDto) => {
-    const created = await parkingService.createApartment(dto);
-    setApartments((prev) => [...prev, created]);
-  }, []);
+    await createApartmentMutation({ variables: { input: toCreateApartmentInput(dto) } });
+    await refetch();
+  }, [createApartmentMutation, refetch]);
 
   const updateApartment = useCallback(async (id: string, dto: UpdateApartmentDto) => {
-    const updated = await parkingService.updateApartment(id, dto);
-    setApartments((prev) => prev.map((a) => (a.id === id ? updated : a)));
-  }, []);
+    await updateApartmentMutation({ variables: { id, input: toUpdateApartmentInput(dto) } });
+    await refetch();
+  }, [refetch, updateApartmentMutation]);
 
   const removeApartment = useCallback(async (id: string) => {
-    await parkingService.removeApartment(id);
-    setApartments((prev) => prev.filter((a) => a.id !== id));
-  }, []);
+    await deleteApartmentMutation({ variables: { id } });
+    await refetch();
+  }, [deleteApartmentMutation, refetch]);
 
   const createSpot = useCallback(async (dto: CreateSpotDto) => {
-    const created = await parkingService.createSpot(dto);
-    setSpots((prev) => [...prev, created]);
-  }, []);
+    await createSpotMutation({ variables: { input: toCreateSpotInput(dto) } });
+    await refetch();
+  }, [createSpotMutation, refetch]);
 
   const updateSpot = useCallback(async (id: string, dto: UpdateSpotDto) => {
-    const updated = await parkingService.updateSpot(id, dto);
-    setSpots((prev) => prev.map((s) => (s.id === id ? updated : s)));
-  }, []);
+    await updateSpotMutation({ variables: { id, input: toUpdateSpotInput(dto) } });
+    await refetch();
+  }, [refetch, updateSpotMutation]);
 
   const removeSpot = useCallback(async (id: string) => {
-    await parkingService.removeSpot(id);
-    setSpots((prev) => prev.filter((s) => s.id !== id));
-  }, []);
+    await deleteSpotMutation({ variables: { id } });
+    await refetch();
+  }, [deleteSpotMutation, refetch]);
 
   const runLottery = useCallback(async () => {
-    setIsRunningLottery(true);
-    try {
-      const newResults = await parkingService.runLottery();
-      setResults(newResults);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setIsRunningLottery(false);
-    }
-  }, []);
+    await executeLottery({ variables: { input: { seed: Date.now() % 100000 } } });
+    await refetch();
+  }, [executeLottery, refetch]);
 
   const resetLottery = useCallback(async () => {
-    await parkingService.resetLottery();
-    setResults([]);
-  }, []);
+    await resetLotteryMutation();
+    await refetch();
+  }, [refetch, resetLotteryMutation]);
 
   return {
-    apartments, spots, results,
-    isLoading, isRunningLottery, error,
-    createApartment, updateApartment, removeApartment,
-    createSpot, updateSpot, removeSpot,
-    runLottery, resetLottery,
+    apartments: realData.apartments,
+    spots: realData.spots,
+    results: realData.results,
+    isLoading: loading,
+    isRunningLottery,
+    error: error?.message ?? null,
+    createApartment,
+    updateApartment,
+    removeApartment,
+    createSpot,
+    updateSpot,
+    removeSpot,
+    runLottery,
+    resetLottery,
   };
 }

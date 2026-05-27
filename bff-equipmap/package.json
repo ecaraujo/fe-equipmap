@@ -2,7 +2,7 @@
   "name": "bff-equipmap",
   "version": "0.1.0",
   "private": true,
-  "description": "EquipMap GraphQL BFF with mocked resolvers for frontend migration.",
+  "description": "EquipMap GraphQL BFF for routing frontend operations to EquipMap microservices.",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -10,13 +10,13 @@
     "build": "tsc -p tsconfig.json && npm run export:schema",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:e2e": "tsx src/smoke-test.ts",
+    "test:e2e": "tsx src/contract-test.ts",
+    "test:contract": "tsx src/contract-test.ts",
     "export:schema": "node scripts/export-schema.mjs"
   },
   "dependencies": {
     "@apollo/server": "^5.5.1",
     "@as-integrations/express4": "^1.1.2",
-    "@faker-js/faker": "^9.9.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "graphql": "^16.11.0",

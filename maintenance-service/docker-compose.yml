@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: equipmap-maintenance-postgres
+    environment:
+      POSTGRES_DB: maintenance_service
+      POSTGRES_USER: maintenance_service
+      POSTGRES_PASSWORD: maintenance_service
+    ports:
+      - "5436:5432"
+    volumes:
+      - maintenance_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maintenance_service -d maintenance_service"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: equipmap-maintenance-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: maintenance_service
+      RABBITMQ_DEFAULT_PASS: maintenance_service
+    ports:
+      - "5674:5672"
+      - "15674:15672"
+    volumes:
+      - maintenance_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  maintenance-service:
+    build:
+      context: ..
+      dockerfile: maintenance-service/Dockerfile
+    container_name: equipmap-maintenance-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/maintenance_service
+      SPRING_DATASOURCE_USERNAME: maintenance_service
+      SPRING_DATASOURCE_PASSWORD: maintenance_service
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: maintenance_service
+      SPRING_RABBITMQ_PASSWORD: maintenance_service
+    ports:
+      - "8084:8084"
+
+volumes:
+  maintenance_postgres_data:
+  maintenance_rabbitmq_data:

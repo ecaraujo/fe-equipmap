@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: equipmap-parking-postgres
+    environment:
+      POSTGRES_DB: parking_service
+      POSTGRES_USER: parking_service
+      POSTGRES_PASSWORD: parking_service
+    ports:
+      - "5438:5432"
+    volumes:
+      - parking_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U parking_service -d parking_service"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  parking-service:
+    build:
+      context: ..
+      dockerfile: parking-service/Dockerfile
+    container_name: equipmap-parking-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/parking_service
+      SPRING_DATASOURCE_USERNAME: parking_service
+      SPRING_DATASOURCE_PASSWORD: parking_service
+    ports:
+      - "8086:8086"
+
+volumes:
+  parking_postgres_data:

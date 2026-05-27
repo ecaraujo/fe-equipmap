@@ -1,0 +1,642 @@
+query Me {
+  me {
+    id
+    name
+    email
+    role
+    avatar
+    condominiumId
+    condominiumName
+    condominiums {
+      id
+      name
+      cnpj
+      address
+      timezone
+      active
+    }
+  }
+}
+
+query DashboardSummary {
+  dashboardSummary {
+    generatedAt
+    condominiumId
+    condominiumName
+    equipmentTotal
+    maintenancePendingTotal
+    maintenanceOverdueTotal
+    warrantyExpiringTotal
+    unreadNotificationsTotal
+    recentEquipment {
+      id
+      name
+      type
+      typeLabel
+      location
+      status
+      statusLabel
+      nextMaintenance
+      patrimonyCode
+    }
+    upcomingMaintenances {
+      id
+      equipment
+      equipmentId
+      type
+      typeLabel
+      status
+      statusLabel
+      scheduledDate
+      description
+    }
+    maintenanceChart {
+      month
+      label
+      completed
+      pending
+    }
+  }
+}
+
+mutation Login($input: LoginInput!) {
+  login(input: $input) {
+    token
+    refreshToken
+    requiresCondominiumSelection
+    user {
+      id
+      name
+      email
+      role
+      avatar
+      condominiumId
+      condominiumName
+      condominiums {
+        id
+        name
+        cnpj
+        address
+        timezone
+        active
+      }
+    }
+  }
+}
+
+mutation Refresh {
+  refresh {
+    token
+    refreshToken
+    requiresCondominiumSelection
+    user {
+      id
+      name
+      email
+      role
+      avatar
+      condominiumId
+      condominiumName
+      condominiums {
+        id
+        name
+        cnpj
+        address
+        timezone
+        active
+      }
+    }
+  }
+}
+
+mutation Logout {
+  logout
+}
+
+mutation SwitchCondominium($condominiumId: ID!) {
+  switchCondominium(condominiumId: $condominiumId) {
+    token
+    refreshToken
+    requiresCondominiumSelection
+    user {
+      id
+      name
+      email
+      role
+      avatar
+      condominiumId
+      condominiumName
+      condominiums {
+        id
+        name
+        cnpj
+        address
+        timezone
+        active
+      }
+    }
+  }
+}
+
+query Equipments($filters: EquipmentFilters, $pagination: PaginationInput) {
+  equipments(filters: $filters, pagination: $pagination) {
+    pageInfo {
+      total
+      page
+      pageSize
+      totalPages
+    }
+    data {
+      id
+      name
+      type
+      typeLabel
+      brand
+      model
+      serialNumber
+      patrimonyCode
+      location
+      status
+      statusLabel
+      acquisitionDate
+      warrantyExpiry
+      lastMaintenance
+      nextMaintenance
+      value
+      createdAt
+      updatedAt
+      createdBy
+    }
+  }
+}
+
+mutation CreateEquipment($input: CreateEquipmentInput!) {
+  createEquipment(input: $input) {
+    id
+    name
+    type
+    typeLabel
+    brand
+    model
+    serialNumber
+    patrimonyCode
+    location
+    status
+    statusLabel
+    acquisitionDate
+    warrantyExpiry
+    lastMaintenance
+    nextMaintenance
+    value
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+mutation UpdateEquipment($id: ID!, $input: UpdateEquipmentInput!) {
+  updateEquipment(id: $id, input: $input) {
+    id
+    name
+    type
+    typeLabel
+    brand
+    model
+    serialNumber
+    patrimonyCode
+    location
+    status
+    statusLabel
+    acquisitionDate
+    warrantyExpiry
+    lastMaintenance
+    nextMaintenance
+    value
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+mutation DeleteEquipment($id: ID!) {
+  deleteEquipment(id: $id)
+}
+
+query Maintenances($filters: MaintenanceFilters, $pagination: PaginationInput) {
+  maintenances(filters: $filters, pagination: $pagination) {
+    pageInfo {
+      total
+    }
+    data {
+      id
+      equipment
+      equipmentId
+      type
+      typeLabel
+      status
+      statusLabel
+      scheduledDate
+      completedDate
+      technician
+      provider
+      description
+      cost
+      observations
+      createdAt
+      updatedAt
+      createdBy
+    }
+  }
+}
+
+mutation CreateMaintenance($input: CreateMaintenanceInput!) {
+  createMaintenance(input: $input) {
+    id
+    equipment
+    equipmentId
+    type
+    typeLabel
+    status
+    statusLabel
+    scheduledDate
+    completedDate
+    technician
+    provider
+    description
+    cost
+    observations
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+mutation CompleteMaintenance($id: ID!, $input: CompleteMaintenanceInput!) {
+  completeMaintenance(id: $id, input: $input) {
+    id
+    equipment
+    equipmentId
+    type
+    typeLabel
+    status
+    statusLabel
+    scheduledDate
+    completedDate
+    technician
+    provider
+    description
+    cost
+    observations
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+mutation DeleteMaintenance($id: ID!) {
+  deleteMaintenance(id: $id)
+}
+
+query Warranties($filters: WarrantyFilters, $pagination: PaginationInput) {
+  warranties(filters: $filters, pagination: $pagination) {
+    pageInfo {
+      total
+    }
+    data {
+      id
+      equipment
+      equipmentId
+      brand
+      model
+      serialNumber
+      supplier
+      supplierContact
+      purchaseDate
+      warrantyStart
+      warrantyEnd
+      warrantyMonths
+      type
+      typeLabel
+      status
+      statusLabel
+      observations
+      documentUrl
+      createdAt
+      updatedAt
+      createdBy
+    }
+  }
+}
+
+mutation CreateWarranty($input: CreateWarrantyInput!) {
+  createWarranty(input: $input) {
+    id
+    equipment
+    equipmentId
+    brand
+    model
+    serialNumber
+    supplier
+    supplierContact
+    purchaseDate
+    warrantyStart
+    warrantyEnd
+    warrantyMonths
+    type
+    typeLabel
+    status
+    statusLabel
+    observations
+    documentUrl
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+query ParkingData {
+  parkingApartments {
+    id
+    unit
+    block
+    ownerName
+    phone
+    email
+    floor
+    hasVehicle
+    createdAt
+    updatedAt
+    createdBy
+  }
+  parkingSpots {
+    id
+    number
+    type
+    typeLabel
+    covered
+    floor
+    assignedTo
+    createdAt
+    updatedAt
+    createdBy
+  }
+  parkingResults {
+    id
+    apartmentId
+    spotId
+    unit
+    block
+    ownerName
+    spotNumber
+    spotType
+    spotTypeLabel
+    seed
+    drawnAt
+    createdAt
+    updatedAt
+    createdBy
+  }
+  lotterySessions {
+    id
+    seed
+    drawnAt
+    undrawnApartments {
+      id
+      unit
+      block
+      ownerName
+    }
+    results {
+      id
+    }
+  }
+}
+
+mutation CreateParkingApartment($input: CreateApartmentInput!) {
+  createParkingApartment(input: $input) {
+    id
+    unit
+    block
+    ownerName
+    phone
+    email
+    floor
+    hasVehicle
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+mutation UpdateParkingApartment($id: ID!, $input: UpdateApartmentInput!) {
+  updateParkingApartment(id: $id, input: $input) {
+    id
+    unit
+    block
+    ownerName
+    phone
+    email
+    floor
+    hasVehicle
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+mutation DeleteParkingApartment($id: ID!) {
+  deleteParkingApartment(id: $id)
+}
+
+mutation CreateParkingSpot($input: CreateParkingSpotInput!) {
+  createParkingSpot(input: $input) {
+    id
+    number
+    type
+    typeLabel
+    covered
+    floor
+    assignedTo
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+mutation UpdateParkingSpot($id: ID!, $input: UpdateParkingSpotInput!) {
+  updateParkingSpot(id: $id, input: $input) {
+    id
+    number
+    type
+    typeLabel
+    covered
+    floor
+    assignedTo
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+mutation DeleteParkingSpot($id: ID!) {
+  deleteParkingSpot(id: $id)
+}
+
+mutation ExecuteLottery($input: ExecuteLotteryInput) {
+  executeLottery(input: $input) {
+    id
+    seed
+    drawnAt
+    undrawnApartments {
+      id
+      unit
+      block
+      ownerName
+    }
+    results {
+      id
+      apartmentId
+      spotId
+      unit
+      block
+      ownerName
+      spotNumber
+      spotType
+      spotTypeLabel
+      seed
+      drawnAt
+    }
+  }
+}
+
+mutation ResetLottery {
+  resetLottery
+}
+
+query Brigadiers($filters: BrigadierFilters) {
+  brigadiers(filters: $filters) {
+    id
+    name
+    apartment
+    block
+    phone
+    role
+    roleLabel
+    certificationDate
+    certificationExpiry
+    certificationBody
+    certificationStatus
+    active
+    observations
+    createdAt
+    updatedAt
+    createdBy
+  }
+  notificationLogs {
+    id
+    channel
+    recipients
+    message
+    sentAt
+    status
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+mutation CreateBrigadier($input: CreateBrigadierInput!) {
+  createBrigadier(input: $input) {
+    id
+    name
+    apartment
+    block
+    phone
+    role
+    roleLabel
+    certificationDate
+    certificationExpiry
+    certificationBody
+    certificationStatus
+    active
+    observations
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+mutation UpdateBrigadier($id: ID!, $input: UpdateBrigadierInput!) {
+  updateBrigadier(id: $id, input: $input) {
+    id
+    name
+    apartment
+    block
+    phone
+    role
+    roleLabel
+    certificationDate
+    certificationExpiry
+    certificationBody
+    certificationStatus
+    active
+    observations
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+mutation DeleteBrigadier($id: ID!) {
+  deleteBrigadier(id: $id)
+}
+
+mutation NotifyBrigadiers($input: NotifyBrigadiersInput!) {
+  notifyBrigadiers(input: $input) {
+    id
+    channel
+    recipients
+    message
+    sentAt
+    status
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+query Notifications {
+  notifications {
+    id
+    type
+    title
+    description
+    severity
+    date
+    read
+  }
+}
+
+mutation MarkNotificationRead($id: ID!) {
+  markNotificationRead(id: $id) {
+    id
+    type
+    title
+    description
+    severity
+    date
+    read
+  }
+}
+
+mutation MarkAllNotificationsRead {
+  markAllNotificationsRead {
+    id
+    type
+    title
+    description
+    severity
+    date
+    read
+  }
+}

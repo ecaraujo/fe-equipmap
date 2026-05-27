@@ -3,7 +3,7 @@ prd_number: "001"
 status: pronto
 priority: alta
 created: 2026-05-18
-updated: 2026-05-19
+updated: 2026-05-20
 issue: ""
 depends_on: []
 references:
@@ -36,9 +36,9 @@ references:
   - `notification-service` — Alertas internos (Java/Spring Boot)
   - `equipmap-core` — Shared lib Java (DTOs, interfaces, constantes)
   - `equipmap-infra` — Docker Compose de integração + IaC
-- **Estado atual**: o frontend segue o padrão Repository + Service Layer, com separação entre configuração de API, contratos TypeScript, services, hooks, contexts e páginas. A variável `VITE_API_BASE_URL` controla o modo de execução: quando vazia, o frontend usa dados mockados; quando preenchida, deve consumir o BFF GraphQL. Os contratos de dados atuais estão em `src/types/` e servirão como **blueprint** para o schema GraphQL; após a migração, serão **substituídos por types gerados via `graphql-codegen`**. Existem 8 domínios de backend identificados como microserviços independentes: `auth-service`, `condominium-service`, `equipment-service`, `maintenance-service`, `warranty-service`, `parking-service`, `brigadier-service` e `notification-service`.
+- **Estado atual**: o frontend usa Apollo Client e exige `VITE_API_BASE_URL` apontando para o BFF GraphQL. O runtime local integrado é BFF + microserviços reais via `equipmap-infra`; dados locais/mockados não são fallback suportado. Os contratos TypeScript são gerados via `graphql-codegen`. Existem 8 domínios de backend identificados como microserviços independentes: `auth-service`, `condominium-service`, `equipment-service`, `maintenance-service`, `warranty-service`, `parking-service`, `brigadier-service` e `notification-service`.
 - **Multi-tenancy**: um usuário/proprietário pode possuir apartamentos em condomínios diferentes que utilizam o EquipMap. O `condominiumId` ativo é vinculado ao JWT (claim assinado), selecionado pós-login e trocável via mutation dedicada.
-- **Problema**: a aplicação possui uma experiência frontend definida, mas ainda depende de dados locais/mockados. Sem backend real, o EquipMap não consegue operar em ambiente produtivo, persistir dados por condomínio, aplicar autenticação/autorização, executar regras de negócio automáticas, controlar histórico operacional nem gerar notificações confiáveis. Os principais afetados são síndicos, administradores de condomínio, equipes de manutenção, brigadistas e gestores operacionais.
+- **Problema**: a aplicação precisava deixar a fase de dados locais/mockados e operar contra backend real. Sem backend real, o EquipMap não consegue operar em ambiente produtivo, persistir dados por condomínio, aplicar autenticação/autorização, executar regras de negócio automáticas, controlar histórico operacional nem gerar notificações confiáveis. Os principais afetados são síndicos, administradores de condomínio, equipes de manutenção, brigadistas e gestores operacionais.
 - **Impacto de não resolver**: a gestão de ativos, manutenções, garantias e comunicações continuará fragmentada em planilhas, controles manuais ou ferramentas desconectadas, aumentando o risco de manutenção vencida, perda de garantia, inconsistência em sorteios de vagas, falha de comunicação com brigadistas e ausência de rastreabilidade operacional.
 
 Este PRD descreve a entrega do MVP backend integrado ao frontend existente, preservando os contratos esperados pela aplicação e criando uma base evolutiva para operação real em múltiplos condomínios.
@@ -52,7 +52,7 @@ Este PRD descreve a entrega do MVP backend integrado ao frontend existente, pres
 - Utilizar autenticação baseada em JWT com claim `condominiumId` assinado, refresh token em httpOnly cookie e autorização por roles (`admin`, `manager`, `viewer`).
 - Persistir dados por condomínio usando `condominiumId` extraído do JWT como chave de isolamento lógico entre tenants.
 - Publicar eventos entre serviços via RabbitMQ (Spring AMQP) para desacoplar atualizações de manutenção, garantias e notificações.
-- Permitir que o frontend deixe de operar em modo mock ao configurar `VITE_API_BASE_URL` apontando para o BFF GraphQL.
+- Exigir `VITE_API_BASE_URL` apontando para o BFF GraphQL para execução do frontend.
 - Manter infraestrutura agnóstica de cloud provider via Docker, abstrações de storage (S3-compatible) e configuração por variáveis de ambiente (12-factor).
 
 ### Decisões-chave
@@ -71,8 +71,8 @@ Este PRD descreve a entrega do MVP backend integrado ao frontend existente, pres
 12. **12 repositórios independentes (não monorepo).** Motivo: deploy independente, ownership claro, pipelines isoladas, liberdade de versionamento por serviço.
 13. **`equipmap-core` como shared lib publicada via Maven registry (GitHub Packages).** Motivo: DTOs de eventos, interfaces e constantes compartilhadas sem acoplamento; Gradle composite build para iteração rápida em dev local.
 14. **Docker Compose por microserviço (autossuficiente).** Motivo: cada repo sobe com `docker compose up` sem depender de repositório externo; inclui suas dependências (Postgres, RabbitMQ, etc.).
-15. **Contract tests em dev, integração real somente em staging.** Motivo: rapidez no ciclo de dev (mocks/stubs) com validação de integração real antes de release.
-16. **`graphql-codegen` no frontend (schema como source of truth).** Motivo: elimina tipos manuais em `src/types/`; garante sincronia frontend↔BFF; gera hooks tipados para Apollo Client.
+15. **Contract tests em dev, integração real em ambiente local e staging.** Motivo: rapidez no ciclo de dev com validação integrada antes de release, sem fallback mock de runtime.
+16. **`graphql-codegen` no frontend (schema como source of truth).** Motivo: elimina tipos manuais em `src/types/`; garante sincronia frontend↔BFF; gera hooks tipados para Apollo Client. Configuração obrigatória: quando `typescript-operations` e `typescript-react-apollo` gerarem o arquivo único `src/graphql/generated.tsx`, não combinar com o plugin `typescript` no mesmo destino, para evitar declarações duplicadas de enums/tipos como `AppNotificationType`. Usar unions literais geradas para enums GraphQL e mapear valores por string (`"ACTIVE"`, `"MAINTENANCE_OVERDUE"`, etc.) em `inputs.ts`, `mappers.ts` e hooks.
 17. **Admin global = usuário com role `admin` em todos os condomínios (sem flag superuser).** Motivo: modelo uniforme RBAC; admin global é consequência da associação, não de campo especial.
 18. **Enums limpos no GraphQL + mapping no BFF.** Motivo: type-safety sobre conveniência; enums sem acentos/espaços; BFF mapeia para labels legíveis quando necessário.
 19. **Seed data via migration script (1 admin + 1 condomínio).** Motivo: bootstrap mínimo para primeiro login sem necessidade de setup manual.
@@ -231,6 +231,10 @@ Como gestor do condomínio, quero cadastrar garantias e acompanhar vencimentos, 
 - Tipos permitidos: `Fabricante`, `Fornecedor`, `Estendida`, `Serviço`.
 - Status de garantia deve ser calculado dinamicamente:
   - `Vencida` quando `warrantyEnd < hoje`.
+  - `Vencendo` quando `warrantyEnd` estiver entre hoje e os proximos 30 dias.
+  - `Vigente` quando `warrantyEnd` estiver alem da janela de 30 dias.
+- O BFF deve expor no `dashboardSummary.warrantyExpiringTotal` a quantidade de garantias vencendo em ate 30 dias para que o frontend exiba o badge ao lado de `Garantias`, seguindo o mesmo padrao do badge de `Manutencoes`.
+- O cadastro de garantias deve enviar `purchaseDate`, `warrantyStart`, `warrantyEnd` em formato ISO `yyyy-MM-dd` e `warrantyMonths >= 1`; quando o usuario informar inicio e fim, o frontend deve calcular a duracao em meses antes de chamar o BFF.
   - `Vencendo` quando vence em até 90 dias.
   - `Vigente` nos demais casos.
 - O sistema deve permitir `documentUrl` para armazenar referência de NF, contrato ou documento de garantia.
@@ -250,6 +254,13 @@ Como gestor do condomínio, quero cadastrar garantias e acompanhar vencimentos, 
 
 **Notas de implementação:**
 - Upload via pre-signed URL: frontend solicita URL ao BFF → BFF chama `warranty-service` → gera pre-signed URL via AWS SDK (S3-compatible) → frontend faz upload direto ao storage → confirma com BFF/backend.
+
+### QR Code de equipamentos para impressao
+
+- A tela de inventario deve permitir gerar um QR Code imprimivel para cada equipamento usando somente os dados reais do equipamento retornados pelo BFF.
+- O QR Code deve ser legivel por celulares e tablets, gerado por biblioteca validada (`qrcode` no frontend) com margem suficiente, tamanho minimo de exibicao/impressao e payload compacto.
+- O payload deve conter os dados atuais do equipamento necessarios para identificacao operacional: `id`, `name`, `patrimonyCode`, `type`, `brand`, `model`, `serialNumber`, `location`, `status`, `acquisitionDate`, `warrantyExpiry`, `lastMaintenance`, `nextMaintenance` e `value`.
+- O QR Code nao deve criar estado mockado, nao deve persistir dados locais e nao substitui um contrato futuro de validacao/armazenamento no backend.
 - Interface `StorageService` com implementação S3-compatible (funciona com MinIO, AWS S3, GCP Cloud Storage, DigitalOcean Spaces).
 - Validação de tipo MIME no backend (não confiar apenas na extensão).
 - Spring `@Scheduled` para job diário.
@@ -324,7 +335,7 @@ Como gestor de segurança do condomínio, quero cadastrar brigadistas, acompanha
 
 **Notas de implementação:**
 - Interface `MessagingProvider` com implementações `WhatsAppProvider` e `SmsProvider` (Strategy Pattern via Spring DI).
-- No MVP, implementar com mock/sandbox. Provedor real definido pós-MVP.
+- No MVP, implementar com `SandboxMessagingProvider` explícito via configuração local. Provedor real definido pós-MVP.
 - Retry configurável via dead-letter queue do RabbitMQ.
 - `@RabbitListener` para processamento assíncrono dos envios.
 
@@ -368,7 +379,7 @@ Como usuário autenticado, quero visualizar e gerenciar notificações do EquipM
 Como desenvolvedor do EquipMap, quero conectar o frontend existente ao BFF GraphQL sem alterar a experiência das telas, para substituir mocks por dados persistentes com baixo retrabalho.
 
 **Rules:**
-- Quando `VITE_API_BASE_URL` estiver vazio, o frontend deve continuar usando mock data.
+- Quando `VITE_API_BASE_URL` estiver vazio, o frontend deve falhar com erro claro de configuração.
 - Quando `VITE_API_BASE_URL` estiver preenchido, o frontend deve consumir o BFF GraphQL.
 - O BFF deve expor um schema GraphQL compatível com os contratos TypeScript já esperados em `src/types/`.
 - O BFF deve retornar erros GraphQL com extensões padronizadas:
@@ -413,7 +424,10 @@ Como desenvolvedor do EquipMap, quero conectar o frontend existente ao BFF Graph
 **Notas de implementação:**
 - Criar suíte de testes de contrato entre frontend ↔ BFF (schema GraphQL) e BFF ↔ microserviços (OpenAPI/REST).
 - Manter compatibilidade com o padrão Repository + Service Layer já definido no frontend.
-- Frontend consume GraphQL via Apollo Client ou urql (a definir durante implementação).
+- Frontend consome GraphQL via Apollo Client.
+- `graphql-codegen` deve gerar `src/graphql/generated.tsx` a partir de `bff-equipmap/schema.graphql` e `src/graphql/operations.graphql`, usando `typescript-operations` e `typescript-react-apollo` no destino único. Não adicionar o plugin `typescript` ao mesmo destino quando os plugins de operações já estiverem emitindo os tipos base, pois isso duplica declarações como `AppNotificationType` e quebra o Vite/Babel com `Identifier '<Tipo>' has already been declared`.
+- Enums GraphQL no frontend devem ser tratados como unions literais geradas pelo codegen; código de mapeamento deve usar chaves string dos valores do schema (`"ADMIN"`, `"ACTIVE"`, `"MAINTENANCE_OVERDUE"`, etc.), não acessos runtime como `Role.Admin` ou `AppNotificationType.MaintenanceOverdue`.
+- Validação obrigatória após alterações no schema, operações GraphQL ou configuração de codegen: executar `npm run codegen` e `npm run build` no `fe-equipmap`.
 - BFF usa Apollo Server ou similar (Node.js).
 
 ## 4. Visão de Arquitetura
@@ -466,7 +480,7 @@ Integrações externas:
 ┌──────────┐     ┌───────────────────────────┐
 │Auth Svc  │────▶│ Google/Microsoft OAuth    │
 │Brig. Svc │────▶│ WhatsApp/SMS Provider     │
-│          │     │ (mock/sandbox no MVP)     │
+│          │     │ (sandbox explícito MVP)    │
 └──────────┘     └───────────────────────────┘
 ```
 
@@ -498,12 +512,12 @@ Integrações externas:
 | Sorteio de vagas deve ser transacional e reprodutível via seed. | Teste de falha forçada no meio do sorteio validando rollback total + re-execução com mesmo seed gerando mesmo resultado. |
 | `patrimonyCode` deve ser único por condomínio. | Teste concorrente tentando criar equipamentos duplicados. |
 | Conclusão de manutenção deve atualizar `lastMaintenance` do equipamento via evento. | Teste de integração entre `maintenance-service`, RabbitMQ e `equipment-service`. |
-| Garantias vencendo em até 90 dias devem gerar alerta de severidade `medium`; garantias vencidas devem gerar `high`. | Teste com datas controladas e validação de notificações geradas. |
+| Garantias vencendo em até 30 dias devem gerar alerta de severidade `medium`; garantias vencidas devem gerar `high`. | Teste com datas controladas e validação de notificações geradas. |
 | Refresh token deve estar em httpOnly cookie e rotacionar a cada uso. | Teste validando que token não é acessível via JS e que reuso de token antigo revoga família. |
 | Soft delete de equipamentos preserva histórico e não aparece em listagem padrão. | Teste de exclusão + verificação de que dados permanecem acessíveis via filtro específico. |
 | Erros devem seguir formato padronizado (RFC 7807 simplificado). | Validação de schema em todas as respostas de erro. |
 | Tempo de resposta p95 ≤ 500ms para endpoints de consulta simples em homologação. | Teste de carga com dataset representativo. |
-| Frontend continua funcionando em modo mock quando `VITE_API_BASE_URL` vazio. | Teste de build e execução local sem backend. |
+| Frontend falha com erro claro quando `VITE_API_BASE_URL` vazio. | Teste de configuração sem variável obrigatória. |
 | Frontend consome backend real quando `VITE_API_BASE_URL` configurado. | Teste end-to-end com ambiente de homologação. |
 
 ### De negócio
@@ -512,7 +526,7 @@ Integrações externas:
 |---------|-------------------|------|-------|-----------------|-------------|
 | Percentual de equipamentos críticos cadastrados no EquipMap | A levantar com síndico/administradora a partir de inventário atual ou planilhas existentes | 90% dos equipamentos críticos cadastrados | 60 dias após go-live do MVP | 75% | Product Owner + gestor do condomínio |
 | Redução de manutenções preventivas atrasadas | A levantar a partir de histórico manual atual ou primeira medição do EquipMap | Reduzir em 30% o volume de manutenções preventivas atrasadas | 90 dias após go-live | Redução de 15% | Product Owner + gestor de manutenção |
-| Garantias com alerta antes do vencimento | A levantar a partir de garantias cadastradas no MVP | 95% das garantias com vencimento em até 90 dias devem gerar alerta | 30 dias após cadastro das garantias | 85% | Product Owner + gestor operacional |
+| Garantias com alerta antes do vencimento | A levantar a partir de garantias cadastradas no MVP | 95% das garantias com vencimento em até 30 dias devem gerar alerta | 30 dias após cadastro das garantias | 85% | Product Owner + gestor operacional |
 | Sorteios de vaga executados sem inconsistência manual | A levantar com histórico de sorteios anteriores | 100% dos sorteios do período registrados com resultado persistido e reprodutível | Próximo ciclo de sorteio após go-live | 95% | Administrador do condomínio |
 | Tempo médio para localizar informações de equipamento | A levantar por observação ou entrevista com usuários-chave | Reduzir em 50% o tempo médio de localização | 60 dias após go-live | Redução de 30% | Product Owner |
 | Brigadistas ativos com certificação válida cadastrada | A levantar com lista atual da brigada | 100% dos brigadistas ativos com data de certificação e validade cadastradas | 45 dias após go-live | 90% | Gestor de segurança |
@@ -625,7 +639,7 @@ Integrações externas:
 - [ ] Implementar monitoramento de vencimento de certificações.
 - [ ] Implementar `POST /brigadiers/notify` com enfileiramento assíncrono via RabbitMQ (Spring AMQP).
 - [ ] Implementar worker de envio com `@RabbitListener` e `NotificationLog` individual por destinatário.
-- [ ] Implementar interface `MessagingProvider` com mock/sandbox (Strategy Pattern via Spring DI).
+- [ ] Implementar interface `MessagingProvider` com provider sandbox explícito (Strategy Pattern via Spring DI).
 - [ ] Implementar retry via dead-letter queue.
 - [ ] Filtro silencioso de brigadistas inativos no envio.
 - [ ] Expor queries e mutations de brigadistas no BFF.
@@ -665,7 +679,7 @@ Integrações externas:
 | Complexidade de manter dois ecossistemas (Node.js + Java). | Médio | Separação clara de responsabilidades: BFF apenas orquestra, microserviços contêm regras de negócio. Docker Compose padronizado para dev. | Monitorando |
 | Eventos duplicados gerando notificações repetidas. | Médio | Idempotência e chave de deduplicação no `notification-service`. | Pendente |
 | Falha parcial entre persistência e publicação de evento. | Alto | Transactional Outbox Pattern para eventos críticos. | Pendente |
-| Escolha tardia de provedor WhatsApp/SMS. | Médio | Interface `MessagingProvider` com mock/sandbox até decisão definitiva. | Monitorando |
+| Escolha tardia de provedor WhatsApp/SMS. | Médio | Interface `MessagingProvider` com provider sandbox explícito até decisão definitiva. | Monitorando |
 | Dados legados inexistentes ou incompletos. | Médio | Carga inicial manual; migração fora do escopo MVP. | Aceito |
 | Métricas de negócio sem baseline confiável. | Médio | Levantar baseline com usuários-chave antes da homologação. | Pendente |
 | Exposição indevida de dados entre condomínios. | Alto | `condominiumId` no claim JWT (não manipulável); testes obrigatórios de isolamento; logs de tentativa cross-tenant. | Pendente |
@@ -682,7 +696,7 @@ Integrações externas:
 | Docker + Docker Compose disponível no ambiente de dev | Interna/Infra | Existente | Afeta todo o desenvolvimento |
 | JDK 21 disponível no ambiente de dev | Interna/Infra | A configurar | Afeta todos os microserviços |
 | Node.js disponível no ambiente de dev | Interna/Infra | Existente | Afeta BFF |
-| Provedor WhatsApp/SMS (decisão) | Externa | A definir (pós-MVP) | Afeta US07 em produção; mock no MVP |
+| Provedor WhatsApp/SMS (decisão) | Externa | A definir (pós-MVP) | Afeta US07 em produção; sandbox explícito no MVP |
 | Ambiente de homologação com Docker | Interna/Infra | Pendente | Afeta milestone 6 |
 | Fonte de dados para baseline de negócio | Interna | A levantar | Afeta critérios de aceite de negócio |
 | Condomínio piloto para homologação | Externa | A definir | Afeta milestone 6 |
@@ -723,10 +737,11 @@ Integrações externas:
 - **2026-05-19:** 12 repositórios independentes (não monorepo). Motivo: deploy independente, ownership claro, pipelines isoladas, liberdade de versionamento por serviço.
 - **2026-05-19:** `equipmap-core` como shared lib publicada via GitHub Packages + Gradle composite build local. Motivo: compartilhar DTOs de eventos e interfaces sem acoplamento; iteração rápida em dev.
 - **2026-05-19:** Docker Compose por microserviço (autossuficiente). Motivo: cada repo sobe independente sem depender de repo externo.
-- **2026-05-19:** Contract tests em dev, integração real somente em staging. Motivo: rapidez no ciclo de dev com validação real antes de release.
+- **2026-05-19:** Contract tests em dev, integração real em local/staging. Motivo: rapidez no ciclo de dev com validação real antes de release.
 - **2026-05-19:** `graphql-codegen` no frontend como source of truth. Motivo: elimina types manuais; garante sincronia frontend↔BFF.
 - **2026-05-19:** Admin global = usuário com role `admin` em todos os condomínios. Motivo: modelo uniforme RBAC sem flag especial.
 - **2026-05-19:** Enums limpos no GraphQL + mapping no BFF. Motivo: type-safety; enums sem acentos/espaços no schema.
 - **2026-05-19:** Seed data via Flyway migration (1 admin + 1 condomínio). Motivo: bootstrap mínimo para primeiro login.
 - **2026-05-19:** Ajustes frontend distribuídos nos milestones. Motivo: cada milestone entrega ponta a ponta.
 - **2026-05-19:** Entidades JPA modeladas: User, RefreshToken, Condominium, CondominiumUser, Equipment, OutboxEvent, MaintenanceRecord, Apartment, ParkingSpot, LotterySession, LotteryResult, Brigadier, NotificationLog. Motivo: design validado durante exploração arquitetural.
+- **2026-05-20:** Configuração de `graphql-codegen` no frontend não deve combinar `typescript` com `typescript-operations`/`typescript-react-apollo` no mesmo arquivo `src/graphql/generated.tsx` quando isso reemitir tipos base. Motivo: evitar declarações duplicadas de enums/tipos (`AppNotificationType`) que quebram o Vite/Babel; enums gerados devem ser consumidos como unions literais e mapeados por strings do schema.

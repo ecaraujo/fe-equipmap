@@ -27,7 +27,6 @@ app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
     service: "bff-equipmap",
-    mockMode: config.mockMode,
     timestamp: new Date().toISOString(),
   });
 });

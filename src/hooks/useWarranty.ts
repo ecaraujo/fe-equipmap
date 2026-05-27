@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
-import { warrantyService } from "../services/warranty.service";
-import type { Warranty, CreateWarrantyDto, WarrantyFilters, AsyncState } from "../types";
+import { useCallback } from "react";
+import { DashboardSummaryDocument, WarrantyStatus, WarrantyType, useCreateWarrantyMutation, useWarrantiesQuery } from "../graphql/generated";
+import { toCreateWarrantyInput } from "../graphql/inputs";
+import { mapWarranty } from "../graphql/mappers";
+import type { AsyncState, CreateWarrantyDto, Warranty, WarrantyFilters } from "../graphql/models";
 
 interface UseWarrantyReturn extends AsyncState<Warranty[]> {
   create: (dto: CreateWarrantyDto) => Promise<Warranty>;
@@ -8,36 +10,57 @@ interface UseWarrantyReturn extends AsyncState<Warranty[]> {
   refetch: () => void;
 }
 
+const statusMap: Record<string, WarrantyStatus> = {
+  Vigente: "ACTIVE",
+  Vencendo: "EXPIRING",
+  Vencida: "EXPIRED",
+};
+
+const typeMap: Record<string, WarrantyType> = {
+  Fabricante: "MANUFACTURER",
+  Fornecedor: "SUPPLIER",
+  Estendida: "EXTENDED",
+  Servico: "SERVICE",
+  Serviço: "SERVICE",
+};
+
+function unsupported(operation: string): never {
+  throw new Error(`${operation} is not supported by the current GraphQL contract yet.`);
+}
+
 export function useWarranty(filters?: WarrantyFilters): UseWarrantyReturn {
-  const [data, setData] = useState<Warranty[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, refetch } = useWarrantiesQuery({
+    variables: {
+      filters: {
+        search: filters?.search || undefined,
+        status: filters?.status && filters.status !== "all" ? statusMap[filters.status] : undefined,
+        type: filters?.type && filters.type !== "all" ? typeMap[filters.type] : undefined,
+      },
+      pagination: { page: filters?.page ?? 1, pageSize: filters?.pageSize ?? 100 },
+    },
+  });
+  const [createWarranty] = useCreateWarrantyMutation();
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await warrantyService.findAll(filters);
-      setData(result);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [filters?.search, filters?.status, filters?.type]);
+  const create = useCallback(async (dto: CreateWarrantyDto) => {
+    const result = await createWarranty({
+      variables: { input: toCreateWarrantyInput(dto) },
+      refetchQueries: [{ query: DashboardSummaryDocument }],
+      awaitRefetchQueries: true,
+    });
+    await refetch();
+    return mapWarranty(result.data!.createWarranty);
+  }, [createWarranty, refetch]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  const create = useCallback(async (dto: CreateWarrantyDto): Promise<Warranty> => {
-    const created = await warrantyService.create(dto);
-    setData((prev) => [created, ...prev]);
-    return created;
+  const remove = useCallback(async (_id: string) => {
+    unsupported("Deleting warranties");
   }, []);
 
-  const remove = useCallback(async (id: string): Promise<void> => {
-    await warrantyService.remove(id);
-    setData((prev) => prev.filter((w) => w.id !== id));
-  }, []);
-
-  return { data, isLoading, error, create, remove, refetch: fetchData };
+  return {
+    data: data?.warranties.data.map(mapWarranty) ?? [],
+    isLoading: loading,
+    error: error?.message ?? null,
+    create,
+    remove,
+    refetch: () => void refetch(),
+  };
 }

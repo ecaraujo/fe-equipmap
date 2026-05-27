@@ -1,0 +1,31 @@
+# Large directories not needed for builds
+node_modules/
+.git/
+dist/
+.codex/
+openspec/
+guidelines/
+__figma__entrypoint__.ts
+
+# Plain JARs (avoid wildcard collisions)
+**/*-plain.jar
+
+# Build caches
+**/build/tmp/
+**/build/classes/
+**/build/generated/
+**/build/resources/
+**/build/reports/
+**/.gradle/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Infra scripts (not needed in image builds)
+equipmap-infra/

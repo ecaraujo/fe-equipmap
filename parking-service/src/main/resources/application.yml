@@ -1,0 +1,30 @@
+server:
+  port: ${SERVER_PORT:8086}
+
+spring:
+  application:
+    name: parking-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5438/parking_service}
+    username: ${SPRING_DATASOURCE_USERNAME:parking_service}
+    password: ${SPRING_DATASOURCE_PASSWORD:parking_service}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState, type ElementType } from "react";
 import {
   Plus,
   Search,
@@ -7,18 +7,14 @@ import {
   ShieldCheck,
   ShieldOff,
   Calendar,
-  ChevronRight,
-  FileText,
-  AlertTriangle,
-  Clock,
   Upload,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Progress } from "./ui/progress";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -33,37 +29,68 @@ import {
 import { Label } from "./ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { useWarranty } from "../../hooks/useWarranty";
-import type { Warranty, CreateWarrantyDto } from "../../types";
+import type { CreateWarrantyDto, Warranty } from "../../graphql/models";
+
+const serviceWarrantyType = "Servi\u00e7o" as Warranty["type"];
+const emptyWarrantyForm: Partial<CreateWarrantyDto> = { type: "Fabricante" };
+
+function todayAtStart(): Date {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return now;
+}
+
+function parseLocalDate(value: string | undefined): Date | null {
+  if (!value) return null;
+  const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  const pt = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (pt) return new Date(Number(pt[3]), Number(pt[2]) - 1, Number(pt[1]));
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 function daysUntil(dateStr: string): number {
-  const [day, month, year] = dateStr.split("/").map(Number);
-  const target = new Date(year, month - 1, day);
-  const now = new Date(2026, 4, 12);
-  return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const target = parseLocalDate(dateStr);
+  if (!target) return 0;
+  return Math.ceil((target.getTime() - todayAtStart().getTime()) / (1000 * 60 * 60 * 24));
 }
 
 function warrantyProgress(start: string, end: string): number {
-  const [ds, ms, ys] = start.split("/").map(Number);
-  const [de, me, ye] = end.split("/").map(Number);
-  const now = new Date(2026, 4, 12);
-  const startDate = new Date(ys, ms - 1, ds);
-  const endDate = new Date(ye, me - 1, de);
+  const startDate = parseLocalDate(start);
+  const endDate = parseLocalDate(end);
+  if (!startDate || !endDate) return 0;
   const total = endDate.getTime() - startDate.getTime();
-  const elapsed = now.getTime() - startDate.getTime();
+  if (total <= 0) return 100;
+  const elapsed = todayAtStart().getTime() - startDate.getTime();
   return Math.min(100, Math.max(0, (elapsed / total) * 100));
 }
 
-const statusConfig: Record<string, { label: string; className: string; icon: React.ElementType; progressColor: string }> = {
-  "Vigente": { label: "Vigente", className: "bg-green-100 text-green-700 border-green-200", icon: ShieldCheck, progressColor: "bg-green-500" },
-  "Vencendo": { label: "Vencendo em breve", className: "bg-amber-100 text-amber-700 border-amber-200", icon: ShieldAlert, progressColor: "bg-amber-500" },
-  "Vencida": { label: "Vencida", className: "bg-red-100 text-red-700 border-red-200", icon: ShieldOff, progressColor: "bg-red-400" },
+function monthsBetween(startIso: string, endIso: string): number {
+  const [startYear, startMonth, startDay] = startIso.split("-").map(Number);
+  const [endYear, endMonth, endDay] = endIso.split("-").map(Number);
+  let months = (endYear - startYear) * 12 + (endMonth - startMonth);
+  if (endDay < startDay) months -= 1;
+  return Math.max(1, months);
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return "Nao foi possivel cadastrar a garantia.";
+}
+
+const statusConfig: Record<string, { className: string; icon: ElementType; progressColor: string }> = {
+  Vigente: { className: "bg-green-100 text-green-700 border-green-200", icon: ShieldCheck, progressColor: "bg-green-500" },
+  Vencendo: { className: "bg-amber-100 text-amber-700 border-amber-200", icon: ShieldAlert, progressColor: "bg-amber-500" },
+  Vencida: { className: "bg-red-100 text-red-700 border-red-200", icon: ShieldOff, progressColor: "bg-red-400" },
 };
 
 const typeColors: Record<string, string> = {
-  "Fabricante": "bg-blue-100 text-blue-700 border-blue-200",
-  "Fornecedor": "bg-purple-100 text-purple-700 border-purple-200",
-  "Estendida": "bg-teal-100 text-teal-700 border-teal-200",
-  "Serviço": "bg-orange-100 text-orange-700 border-orange-200",
+  Fabricante: "bg-blue-100 text-blue-700 border-blue-200",
+  Fornecedor: "bg-purple-100 text-purple-700 border-purple-200",
+  Estendida: "bg-teal-100 text-teal-700 border-teal-200",
+  [serviceWarrantyType]: "bg-orange-100 text-orange-700 border-orange-200",
+  "ServiÃ§o": "bg-orange-100 text-orange-700 border-orange-200",
 };
 
 export function WarrantyPage() {
@@ -71,73 +98,100 @@ export function WarrantyPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [selectedWarranty, setSelectedWarranty] = useState<Warranty | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newWarranty, setNewWarranty] = useState<Partial<CreateWarrantyDto>>({ type: "Fabricante" });
+  const [newWarranty, setNewWarranty] = useState<Partial<CreateWarrantyDto>>(emptyWarrantyForm);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { data: allWarranties, isLoading, create } = useWarranty({ search });
+  const { data: allWarranties, create } = useWarranty({ search });
 
-  const tabFilter = (w: Warranty) => {
-    if (activeTab === "active") return w.status === "Vigente";
-    if (activeTab === "expiring") return w.status === "Vencendo";
-    if (activeTab === "expired") return w.status === "Vencida";
+  const filtered = useMemo(() => allWarranties.filter((warranty) => {
+    if (activeTab === "active") return warranty.status === "Vigente";
+    if (activeTab === "expiring") return warranty.status === "Vencendo";
+    if (activeTab === "expired") return warranty.status === "Vencida";
     return true;
-  };
-
-  const filtered = useMemo(() => allWarranties.filter(tabFilter), [allWarranties, activeTab]);
+  }), [allWarranties, activeTab]);
 
   const counts = useMemo(() => ({
     all: allWarranties.length,
-    active: allWarranties.filter((w) => w.status === "Vigente").length,
-    expiring: allWarranties.filter((w) => w.status === "Vencendo").length,
-    expired: allWarranties.filter((w) => w.status === "Vencida").length,
+    active: allWarranties.filter((warranty) => warranty.status === "Vigente").length,
+    expiring: allWarranties.filter((warranty) => warranty.status === "Vencendo").length,
+    expired: allWarranties.filter((warranty) => warranty.status === "Vencida").length,
   }), [allWarranties]);
 
+  const resetForm = () => {
+    setFormError(null);
+    setNewWarranty(emptyWarrantyForm);
+  };
+
   const handleAdd = async () => {
-    await create(newWarranty as CreateWarrantyDto);
-    setShowAddModal(false);
-    setNewWarranty({ type: "Fabricante" });
+    setFormError(null);
+    const warrantyStart = newWarranty.warrantyStart;
+    const warrantyEnd = newWarranty.warrantyEnd;
+    const requiredFields: Array<keyof CreateWarrantyDto> = ["equipment", "brand", "model", "supplier", "type"];
+    const missingField = requiredFields.find((field) => !String(newWarranty[field] ?? "").trim());
+
+    if (missingField || !warrantyStart || !warrantyEnd) {
+      setFormError("Preencha os campos obrigatorios antes de cadastrar a garantia.");
+      return;
+    }
+
+    const startDate = parseLocalDate(warrantyStart);
+    const endDate = parseLocalDate(warrantyEnd);
+    if (!startDate || !endDate || endDate.getTime() < startDate.getTime()) {
+      setFormError("O fim da garantia deve ser igual ou posterior ao inicio.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await create({
+        ...newWarranty,
+        purchaseDate: newWarranty.purchaseDate || warrantyStart,
+        warrantyMonths: newWarranty.warrantyMonths ?? monthsBetween(warrantyStart, warrantyEnd),
+      } as CreateWarrantyDto);
+      setShowAddModal(false);
+      resetForm();
+    } catch (error) {
+      setFormError(errorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-gray-900">Garantias</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Controle de garantias de equipamentos e serviços</p>
+          <p className="text-sm text-gray-500 mt-0.5">Controle de garantias de equipamentos e servicos</p>
         </div>
-        <Button
-          size="sm"
-          className="bg-blue-700 hover:bg-blue-800 text-white gap-2"
-          onClick={() => setShowAddModal(true)}
-        >
+        <Button size="sm" className="bg-blue-700 hover:bg-blue-800 text-white gap-2" onClick={() => setShowAddModal(true)}>
           <Plus className="w-4 h-4" /> Nova garantia
         </Button>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: "Total", value: counts.all, icon: Shield, color: "text-gray-600", bg: "bg-gray-100" },
           { label: "Vigentes", value: counts.active, icon: ShieldCheck, color: "text-green-600", bg: "bg-green-100" },
           { label: "Vencendo", value: counts.expiring, icon: ShieldAlert, color: "text-amber-600", bg: "bg-amber-100" },
           { label: "Vencidas", value: counts.expired, icon: ShieldOff, color: "text-red-600", bg: "bg-red-100" },
-        ].map((s) => {
-          const Icon = s.icon;
+        ].map((stat) => {
+          const Icon = stat.icon;
           return (
-            <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
-              <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center shrink-0`}>
-                <Icon className={`w-5 h-5 ${s.color}`} />
+            <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
+              <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center shrink-0`}>
+                <Icon className={`w-5 h-5 ${stat.color}`} />
               </div>
               <div>
-                <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
-                <div className="text-xs text-gray-500">{s.label}</div>
+                <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
+                <div className="text-xs text-gray-500">{stat.label}</div>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Cards */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="p-4 border-b border-gray-100">
           <div className="relative">
@@ -146,7 +200,7 @@ export function WarrantyPage() {
               placeholder="Buscar por equipamento, marca ou ID..."
               className="pl-9"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
             />
           </div>
         </div>
@@ -174,7 +228,7 @@ export function WarrantyPage() {
           <TabsContent value={activeTab} className="m-0 p-4">
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map((warranty) => {
-                const status = statusConfig[warranty.status];
+                const status = statusConfig[warranty.status] ?? statusConfig.Vigente;
                 const StatusIcon = status.icon;
                 const days = daysUntil(warranty.warrantyEnd);
                 const progress = warrantyProgress(warranty.warrantyStart, warranty.warrantyEnd);
@@ -194,7 +248,7 @@ export function WarrantyPage() {
                           warranty.status === "Vencendo" ? "text-amber-600" : "text-red-500"
                         }`} />
                       </div>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${typeColors[warranty.type]}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${typeColors[warranty.type] ?? typeColors.Fabricante}`}>
                         {warranty.type}
                       </span>
                     </div>
@@ -215,22 +269,13 @@ export function WarrantyPage() {
                         </span>
                       </div>
                       <div className="w-full bg-gray-100 rounded-full h-1.5">
-                        <div
-                          className={`h-1.5 rounded-full ${status.progressColor}`}
-                          style={{ width: `${progress}%` }}
-                        />
+                        <div className={`h-1.5 rounded-full ${status.progressColor}`} style={{ width: `${progress}%` }} />
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between text-xs text-gray-400">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {warranty.warrantyStart}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {warranty.warrantyEnd}
-                      </span>
+                      <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{warranty.warrantyStart}</span>
+                      <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{warranty.warrantyEnd}</span>
                     </div>
 
                     <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-400 truncate">
@@ -250,7 +295,6 @@ export function WarrantyPage() {
         </Tabs>
       </div>
 
-      {/* Detail Modal */}
       <Dialog open={!!selectedWarranty} onOpenChange={() => setSelectedWarranty(null)}>
         <DialogContent className="max-w-lg">
           {selectedWarranty && (
@@ -260,13 +304,14 @@ export function WarrantyPage() {
                   <Shield className="w-5 h-5 text-blue-600" />
                   {selectedWarranty.equipment}
                 </DialogTitle>
+                <DialogDescription>Dados atuais da garantia carregados pelo BFF.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-2">
                 <div className="flex flex-wrap gap-2">
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${statusConfig[selectedWarranty.status].className}`}>
                     {selectedWarranty.status}
                   </span>
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${typeColors[selectedWarranty.type]}`}>
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${typeColors[selectedWarranty.type] ?? typeColors.Fabricante}`}>
                     {selectedWarranty.type}
                   </span>
                 </div>
@@ -281,27 +326,24 @@ export function WarrantyPage() {
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${statusConfig[selectedWarranty.status].progressColor}`}
-                      style={{ width: `${warrantyProgress(selectedWarranty.warrantyStart, selectedWarranty.warrantyEnd)}%` }}
-                    />
+                    <div className={`h-2 rounded-full ${statusConfig[selectedWarranty.status].progressColor}`} style={{ width: `${warrantyProgress(selectedWarranty.warrantyStart, selectedWarranty.warrantyEnd)}%` }} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div><span className="text-gray-400 text-xs">Marca / Modelo</span><div className="text-gray-900">{selectedWarranty.brand} {selectedWarranty.model}</div></div>
-                  <div><span className="text-gray-400 text-xs">N° de Série</span><div className="text-gray-900 font-mono">{selectedWarranty.serialNumber}</div></div>
+                  <div><span className="text-gray-400 text-xs">Numero de serie</span><div className="text-gray-900 font-mono">{selectedWarranty.serialNumber ?? "-"}</div></div>
                   <div><span className="text-gray-400 text-xs">Fornecedor</span><div className="text-gray-900">{selectedWarranty.supplier}</div></div>
-                  <div><span className="text-gray-400 text-xs">Contato</span><div className="text-gray-900">{selectedWarranty.supplierContact}</div></div>
-                  <div><span className="text-gray-400 text-xs">Início da garantia</span><div className="text-gray-900">{selectedWarranty.warrantyStart}</div></div>
+                  <div><span className="text-gray-400 text-xs">Contato</span><div className="text-gray-900">{selectedWarranty.supplierContact ?? "-"}</div></div>
+                  <div><span className="text-gray-400 text-xs">Inicio da garantia</span><div className="text-gray-900">{selectedWarranty.warrantyStart}</div></div>
                   <div><span className="text-gray-400 text-xs">Fim da garantia</span><div className="text-gray-900">{selectedWarranty.warrantyEnd}</div></div>
-                  <div><span className="text-gray-400 text-xs">Duração</span><div className="text-gray-900">{selectedWarranty.warrantyMonths} meses</div></div>
+                  <div><span className="text-gray-400 text-xs">Duracao</span><div className="text-gray-900">{selectedWarranty.warrantyMonths} meses</div></div>
                   <div><span className="text-gray-400 text-xs">Data de compra</span><div className="text-gray-900">{selectedWarranty.purchaseDate}</div></div>
                 </div>
 
                 {selectedWarranty.observations && (
                   <div>
-                    <span className="text-gray-400 text-xs">Observações</span>
+                    <span className="text-gray-400 text-xs">Observacoes</span>
                     <p className="text-sm text-gray-900 mt-1">{selectedWarranty.observations}</p>
                   </div>
                 )}
@@ -316,66 +358,103 @@ export function WarrantyPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Modal */}
-      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+      <Dialog open={showAddModal} onOpenChange={(open) => {
+        setShowAddModal(open);
+        if (!open) resetForm();
+      }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Cadastrar garantia</DialogTitle>
+            <DialogDescription>Preencha os dados obrigatorios para criar a garantia no backend.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
+            {formError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {formError}
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label>Equipamento *</Label>
-              <Input placeholder="Nome do equipamento" onChange={(e) => setNewWarranty({ ...newWarranty, equipment: e.target.value })} />
+              <Input value={newWarranty.equipment ?? ""} placeholder="Nome do equipamento" onChange={(event) => setNewWarranty({ ...newWarranty, equipment: event.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Marca *</Label>
-                <Input placeholder="Ex: Midea" onChange={(e) => setNewWarranty({ ...newWarranty, brand: e.target.value })} />
+                <Input value={newWarranty.brand ?? ""} placeholder="Ex: Midea" onChange={(event) => setNewWarranty({ ...newWarranty, brand: event.target.value })} />
               </div>
               <div className="space-y-1.5">
-                <Label>Modelo</Label>
-                <Input placeholder="Ex: MSplit 12000" onChange={(e) => setNewWarranty({ ...newWarranty, model: e.target.value })} />
+                <Label>Modelo *</Label>
+                <Input value={newWarranty.model ?? ""} placeholder="Ex: MSplit 12000" onChange={(event) => setNewWarranty({ ...newWarranty, model: event.target.value })} />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label>Tipo de garantia *</Label>
-              <Select defaultValue="Fabricante" onValueChange={(v) => setNewWarranty({ ...newWarranty, type: v as Warranty["type"] })}>
+              <Select value={newWarranty.type ?? "Fabricante"} onValueChange={(value) => setNewWarranty({ ...newWarranty, type: value as Warranty["type"] })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Fabricante">Fabricante</SelectItem>
                   <SelectItem value="Fornecedor">Fornecedor</SelectItem>
                   <SelectItem value="Estendida">Estendida</SelectItem>
-                  <SelectItem value="Serviço">Serviço</SelectItem>
+                  <SelectItem value={serviceWarrantyType}>Servico</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Fornecedor *</Label>
-              <Input placeholder="Nome do fornecedor/fabricante" onChange={(e) => setNewWarranty({ ...newWarranty, supplier: e.target.value })} />
+              <Input value={newWarranty.supplier ?? ""} placeholder="Nome do fornecedor/fabricante" onChange={(event) => setNewWarranty({ ...newWarranty, supplier: event.target.value })} />
             </div>
             <div className="space-y-1.5">
               <Label>Contato do fornecedor</Label>
-              <Input placeholder="Telefone ou e-mail" onChange={(e) => setNewWarranty({ ...newWarranty, supplierContact: e.target.value })} />
+              <Input value={newWarranty.supplierContact ?? ""} placeholder="Telefone ou e-mail" onChange={(event) => setNewWarranty({ ...newWarranty, supplierContact: event.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Data de compra *</Label>
+              <Input type="date" value={newWarranty.purchaseDate ?? ""} onChange={(event) => setNewWarranty({ ...newWarranty, purchaseDate: event.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Início da garantia *</Label>
-                <Input type="date" onChange={(e) => setNewWarranty({ ...newWarranty, warrantyStart: new Date(e.target.value).toLocaleDateString("pt-BR") })} />
+                <Label>Inicio da garantia *</Label>
+                <Input type="date" value={newWarranty.warrantyStart ?? ""} onChange={(event) => {
+                  const warrantyStart = event.target.value;
+                  setNewWarranty({
+                    ...newWarranty,
+                    warrantyStart,
+                    purchaseDate: newWarranty.purchaseDate || warrantyStart,
+                    warrantyMonths: warrantyStart && newWarranty.warrantyEnd ? monthsBetween(warrantyStart, newWarranty.warrantyEnd) : newWarranty.warrantyMonths,
+                  });
+                }} />
               </div>
               <div className="space-y-1.5">
                 <Label>Fim da garantia *</Label>
-                <Input type="date" onChange={(e) => setNewWarranty({ ...newWarranty, warrantyEnd: new Date(e.target.value).toLocaleDateString("pt-BR") })} />
+                <Input type="date" value={newWarranty.warrantyEnd ?? ""} onChange={(event) => {
+                  const warrantyEnd = event.target.value;
+                  setNewWarranty({
+                    ...newWarranty,
+                    warrantyEnd,
+                    warrantyMonths: newWarranty.warrantyStart && warrantyEnd ? monthsBetween(newWarranty.warrantyStart, warrantyEnd) : newWarranty.warrantyMonths,
+                  });
+                }} />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Observações</Label>
-              <Input placeholder="Condições, restrições da garantia..." onChange={(e) => setNewWarranty({ ...newWarranty, observations: e.target.value })} />
+              <Label>Duracao da garantia (meses)</Label>
+              <Input
+                type="number"
+                min={1}
+                value={newWarranty.warrantyMonths ?? ""}
+                placeholder="Calculado automaticamente"
+                onChange={(event) => setNewWarranty({ ...newWarranty, warrantyMonths: event.target.value ? Number(event.target.value) : undefined })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Observacoes</Label>
+              <Input value={newWarranty.observations ?? ""} placeholder="Condicoes, restricoes da garantia..." onChange={(event) => setNewWarranty({ ...newWarranty, observations: event.target.value })} />
             </div>
           </div>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setShowAddModal(false)}>Cancelar</Button>
-            <Button className="bg-blue-700 hover:bg-blue-800 text-white" onClick={handleAdd}>
-              Cadastrar garantia
+            <Button variant="outline" onClick={() => setShowAddModal(false)} disabled={isSubmitting}>Cancelar</Button>
+            <Button className="bg-blue-700 hover:bg-blue-800 text-white" onClick={handleAdd} disabled={isSubmitting}>
+              {isSubmitting ? "Cadastrando..." : "Cadastrar garantia"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,0 +1,48 @@
+server:
+  port: ${SERVER_PORT:8085}
+
+spring:
+  application:
+    name: warranty-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5437/warranty_service}
+    username: ${SPRING_DATASOURCE_USERNAME:warranty_service}
+    password: ${SPRING_DATASOURCE_PASSWORD:warranty_service}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5675}
+    username: ${SPRING_RABBITMQ_USERNAME:warranty_service}
+    password: ${SPRING_RABBITMQ_PASSWORD:warranty_service}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+equipmap:
+  outbox:
+    polling-delay-ms: ${OUTBOX_POLLING_DELAY_MS:5000}
+  warranty:
+    expiring-window-days: ${WARRANTY_EXPIRING_WINDOW_DAYS:30}
+  storage:
+    endpoint: ${EQUIPMAP_STORAGE_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${EQUIPMAP_STORAGE_PUBLIC_ENDPOINT:http://localhost:9000}
+    bucket: ${EQUIPMAP_STORAGE_BUCKET:equipmap-warranty-documents}
+    access-key: ${EQUIPMAP_STORAGE_ACCESS_KEY:warranty_service}
+    secret-key: ${EQUIPMAP_STORAGE_SECRET_KEY:warranty_service}
+    presigned-expiration-minutes: ${EQUIPMAP_STORAGE_PRESIGNED_EXPIRATION_MINUTES:15}

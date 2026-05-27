@@ -79,6 +79,7 @@ enum NotificationChannel {
 }
 
 enum NotificationDeliveryStatus {
+  QUEUED
   SENT
   FAILED
 }
@@ -255,9 +256,9 @@ type Apartment implements Node & Auditable {
   unit: String!
   block: String!
   ownerName: String!
-  phone: String!
+  phone: String
   email: String
-  floor: Int!
+  floor: Int
   hasVehicle: Boolean!
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -345,11 +346,33 @@ type AppNotification implements Node {
   condominiumId: ID!
   userId: ID!
   type: AppNotificationType!
+  resourceId: ID
   title: String!
   description: String!
   severity: NotificationSeverity!
   date: DateTime
   read: Boolean!
+}
+
+type DashboardMaintenanceBucket {
+  month: String!
+  label: String!
+  completed: Int!
+  pending: Int!
+}
+
+type DashboardSummary {
+  generatedAt: DateTime!
+  condominiumId: ID
+  condominiumName: String
+  equipmentTotal: Int!
+  maintenancePendingTotal: Int!
+  maintenanceOverdueTotal: Int!
+  warrantyExpiringTotal: Int!
+  unreadNotificationsTotal: Int!
+  recentEquipment: [Equipment!]!
+  upcomingMaintenances: [MaintenanceRecord!]!
+  maintenanceChart: [DashboardMaintenanceBucket!]!
 }
 
 input PaginationInput {
@@ -474,7 +497,7 @@ input CreateWarrantyInput {
   purchaseDate: DateTime!
   warrantyStart: DateTime!
   warrantyEnd: DateTime!
-  warrantyMonths: Int
+  warrantyMonths: Int!
   type: WarrantyType!
   observations: String
 }
@@ -505,9 +528,9 @@ input CreateApartmentInput {
   unit: String!
   block: String!
   ownerName: String!
-  phone: String!
+  phone: String
   email: String
-  floor: Int!
+  floor: Int
   hasVehicle: Boolean!
 }
 
@@ -580,6 +603,7 @@ input NotifyBrigadiersInput {
 
 type Query {
   me: User!
+  dashboardSummary: DashboardSummary!
   condominiums: [Condominium!]!
   condominium(id: ID!): Condominium
   condominiumUsers(condominiumId: ID!): [CondominiumUser!]!

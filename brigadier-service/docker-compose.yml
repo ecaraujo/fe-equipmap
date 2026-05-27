@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: equipmap-brigadier-postgres
+    environment:
+      POSTGRES_DB: brigadier_service
+      POSTGRES_USER: brigadier_service
+      POSTGRES_PASSWORD: brigadier_service
+    ports:
+      - "5439:5432"
+    volumes:
+      - brigadier_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brigadier_service -d brigadier_service"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: equipmap-brigadier-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: brigadier_service
+      RABBITMQ_DEFAULT_PASS: brigadier_service
+    ports:
+      - "5676:5672"
+      - "15676:15672"
+    volumes:
+      - brigadier_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  brigadier-service:
+    build:
+      context: ..
+      dockerfile: brigadier-service/Dockerfile
+    container_name: equipmap-brigadier-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/brigadier_service
+      SPRING_DATASOURCE_USERNAME: brigadier_service
+      SPRING_DATASOURCE_PASSWORD: brigadier_service
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: brigadier_service
+      SPRING_RABBITMQ_PASSWORD: brigadier_service
+      EQUIPMAP_MESSAGING_PROVIDER: sandbox
+    ports:
+      - "8087:8087"
+
+volumes:
+  brigadier_postgres_data:
+  brigadier_rabbitmq_data:

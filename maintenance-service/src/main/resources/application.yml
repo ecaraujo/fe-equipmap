@@ -1,0 +1,39 @@
+server:
+  port: ${SERVER_PORT:8084}
+
+spring:
+  application:
+    name: maintenance-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5436/maintenance_service}
+    username: ${SPRING_DATASOURCE_USERNAME:maintenance_service}
+    password: ${SPRING_DATASOURCE_PASSWORD:maintenance_service}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5674}
+    username: ${SPRING_RABBITMQ_USERNAME:maintenance_service}
+    password: ${SPRING_RABBITMQ_PASSWORD:maintenance_service}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+equipmap:
+  outbox:
+    polling-delay-ms: ${OUTBOX_POLLING_DELAY_MS:5000}

@@ -20,13 +20,12 @@ Aplicação web para gestão de equipamentos, manutenções, garantias e operaç
 
 ## Arquitetura Frontend
 
-O projeto segue o padrão **Repository + Service Layer**, separando a lógica de dados da apresentação:
+O projeto usa Apollo Client para consumir o BFF GraphQL integrado aos microserviços reais:
 
 ```
 src/
-├── config/          # Configuração da API (baseUrl, endpoints, mock/real switch)
-├── types/           # Contratos TypeScript (Entities, DTOs, Filters)
-├── services/        # Camada de serviço (Interface → Mock → API Implementation)
+├── config/          # Configuração obrigatória da API GraphQL
+├── graphql/         # Operações e types gerados pelo graphql-codegen
 ├── hooks/           # Custom hooks de acesso a dados
 ├── contexts/        # React Context (Auth, Notifications)
 └── app/             # Componentes e páginas
@@ -36,7 +35,7 @@ src/
 
 ```bash
 # .env
-VITE_API_BASE_URL=          # Vazio = usa mock data; preenchido = usa API real
+VITE_API_BASE_URL=http://localhost:4000/graphql
 VITE_API_TIMEOUT=10000
 VITE_AUTH_TOKEN_TYPE=Bearer
 VITE_AUTH_TOKEN_KEY=equipmap_auth_token
@@ -269,7 +268,7 @@ UpdateWarrantyDto  Partial<CreateWarrantyDto>
 ```
 
 #### Regras de negócio
-- `status` é **calculado** dinamicamente: `Vencendo` = vence em ≤ 90 dias; `Vencida` = `warrantyEnd < hoje`
+- `status` é **calculado** dinamicamente: `Vencendo` = vence em ≤ 30 dias; `Vencida` = `warrantyEnd < hoje`
 - Job diário verifica garantias prestes a vencer e publica eventos para `notification-service`
 - Upload de documento (NF, contrato) integrado com serviço de armazenamento (S3 ou similar)
 
@@ -495,12 +494,12 @@ AppNotification
 
 ## Conectando o Frontend ao Backend
 
-Para conectar o frontend à API real, basta definir a variável de ambiente:
+Para executar o frontend, defina a variável obrigatória:
 
 ```bash
-VITE_API_BASE_URL=https://api.equipmap.com.br
+VITE_API_BASE_URL=http://localhost:4000/graphql
 ```
 
-Sem ela, a aplicação roda em modo **mock** com dados locais, sem necessidade de backend.
+Sem ela, a aplicação falha com erro de configuração. O runtime suportado usa o BFF GraphQL e os microserviços reais.
 
-Todos os contratos de dados (DTOs, interfaces, filtros) estão definidos em `src/types/` e refletem exatamente o que cada endpoint deve receber e retornar.
+Os contratos do frontend são gerados a partir do schema GraphQL em `src/graphql/generated.tsx`.

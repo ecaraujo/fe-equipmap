@@ -9,12 +9,14 @@ import {
   XCircle,
   Wrench,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -29,7 +31,7 @@ import {
 import { Label } from "./ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { useMaintenance } from "../../hooks/useMaintenance";
-import type { MaintenanceRecord, CreateMaintenanceDto } from "../../types";
+import type { MaintenanceRecord, CreateMaintenanceDto } from "../../graphql/models";
 
 const statusConfig: Record<string, { label: string; className: string; icon: React.ElementType }> = {
   "Pendente": { label: "Pendente", className: "bg-blue-100 text-blue-700 border-blue-200", icon: Clock },
@@ -45,14 +47,19 @@ const typeConfig: Record<string, string> = {
   "Preditiva": "bg-teal-100 text-teal-700 border-teal-200",
 };
 
+function formatCurrency(value?: number | null): string | null {
+  return typeof value === "number" ? `R$ ${value.toLocaleString("pt-BR")}` : null;
+}
+
 export function MaintenancePage() {
   const [search, setSearch] = useState("");
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newRecord, setNewRecord] = useState<Partial<CreateMaintenanceDto>>({ type: "Preventiva" });
   const [activeTab, setActiveTab] = useState("all");
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const { data: allRecords, isLoading, create, complete } = useMaintenance({ search });
+  const { data: allRecords, isLoading, create, complete, remove } = useMaintenance({ search });
 
   const tabFilter = (r: MaintenanceRecord) => {
     if (activeTab === "pending") return r.status === "Pendente" || r.status === "Em andamento";
@@ -71,16 +78,36 @@ export function MaintenancePage() {
   }), [allRecords]);
 
   const handleAdd = async () => {
-    await create(newRecord as CreateMaintenanceDto);
-    setShowAddModal(false);
-    setNewRecord({ type: "Preventiva" });
+    setActionError(null);
+    try {
+      await create(newRecord as CreateMaintenanceDto);
+      setShowAddModal(false);
+      setNewRecord({ type: "Preventiva" });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Nao foi possivel agendar a manutencao.");
+    }
   };
 
   const handleComplete = async (id: string) => {
-    await complete(id, {
-      completedDate: new Date().toLocaleDateString("pt-BR"),
-    });
-    setSelectedRecord(null);
+    setActionError(null);
+    try {
+      await complete(id, {
+        completedDate: new Date().toISOString().slice(0, 10),
+      });
+      setSelectedRecord(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Nao foi possivel concluir a manutencao.");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setActionError(null);
+    try {
+      await remove(id);
+      setSelectedRecord(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Nao foi possivel excluir a manutencao.");
+    }
   };
 
   return (
@@ -115,6 +142,11 @@ export function MaintenancePage() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200">
+        {actionError && (
+          <div className="m-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {actionError}
+          </div>
+        )}
         <div className="p-4 border-b border-gray-100">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -156,6 +188,7 @@ export function MaintenancePage() {
               ) : filtered.map((record) => {
                 const status = statusConfig[record.status];
                 const StatusIcon = status.icon;
+                const costLabel = formatCurrency(record.cost);
                 return (
                   <div
                     key={record.id}
@@ -192,7 +225,7 @@ export function MaintenancePage() {
                         </span>
                         {record.technician && <span>Técnico: {record.technician}</span>}
                         {record.provider && <span>Empresa: {record.provider}</span>}
-                        {record.cost && <span>Custo: R$ {record.cost.toLocaleString("pt-BR")}</span>}
+                        {costLabel && <span>Custo: {costLabel}</span>}
                       </div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-gray-300 shrink-0 mt-1" />
@@ -220,6 +253,9 @@ export function MaintenancePage() {
                   <Wrench className="w-5 h-5 text-blue-600" />
                   {selectedRecord.equipment}
                 </DialogTitle>
+                <DialogDescription>
+                  Consulte os detalhes da manutencao e execute as acoes disponiveis.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-2">
                 <div className="flex flex-wrap gap-2">
@@ -236,7 +272,7 @@ export function MaintenancePage() {
                   {selectedRecord.completedDate && <div><span className="text-gray-400 text-xs">Concluído em</span><div className="text-gray-900">{selectedRecord.completedDate}</div></div>}
                   {selectedRecord.technician && <div><span className="text-gray-400 text-xs">Técnico</span><div className="text-gray-900">{selectedRecord.technician}</div></div>}
                   {selectedRecord.provider && <div><span className="text-gray-400 text-xs">Empresa</span><div className="text-gray-900">{selectedRecord.provider}</div></div>}
-                  {selectedRecord.cost !== undefined && <div><span className="text-gray-400 text-xs">Custo</span><div className="text-gray-900">R$ {selectedRecord.cost.toLocaleString("pt-BR")}</div></div>}
+                  {formatCurrency(selectedRecord.cost) && <div><span className="text-gray-400 text-xs">Custo</span><div className="text-gray-900">{formatCurrency(selectedRecord.cost)}</div></div>}
                 </div>
                 <div>
                   <span className="text-gray-400 text-xs">Descrição</span>
@@ -250,6 +286,9 @@ export function MaintenancePage() {
                 )}
               </div>
               <DialogFooter className="mt-2">
+                <Button variant="outline" className="gap-2 text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleDelete(selectedRecord.id)}>
+                  <Trash2 className="w-4 h-4" /> Excluir
+                </Button>
                 {selectedRecord.status !== "Concluída" && (
                   <Button className="bg-green-600 hover:bg-green-700 text-white gap-2" onClick={() => handleComplete(selectedRecord.id)}>
                     <CheckCircle2 className="w-4 h-4" /> Marcar como concluída

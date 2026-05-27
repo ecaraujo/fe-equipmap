@@ -3,3 +3,10 @@ dist/
 .env
 .env.local
 *.local
+.tools/
+.vscode/
+*.log
+*.class
+bin/
+.gradle-home*/
+.tmp*/

@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: equipmap-equipment-postgres
+    environment:
+      POSTGRES_DB: equipment_service
+      POSTGRES_USER: equipment_service
+      POSTGRES_PASSWORD: equipment_service
+    ports:
+      - "5435:5432"
+    volumes:
+      - equipment_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U equipment_service -d equipment_service"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: equipmap-equipment-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: equipment_service
+      RABBITMQ_DEFAULT_PASS: equipment_service
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    volumes:
+      - equipment_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  equipment-service:
+    build:
+      context: ..
+      dockerfile: equipment-service/Dockerfile
+    container_name: equipmap-equipment-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/equipment_service
+      SPRING_DATASOURCE_USERNAME: equipment_service
+      SPRING_DATASOURCE_PASSWORD: equipment_service
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: equipment_service
+      SPRING_RABBITMQ_PASSWORD: equipment_service
+    ports:
+      - "8083:8083"
+
+volumes:
+  equipment_postgres_data:
+  equipment_rabbitmq_data:

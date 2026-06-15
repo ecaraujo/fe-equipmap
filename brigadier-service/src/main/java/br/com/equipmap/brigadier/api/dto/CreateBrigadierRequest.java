@@ -8,6 +8,8 @@ import java.time.LocalDate;
 
 public record CreateBrigadierRequest(
         @NotBlank String name,
+        @NotBlank String apartment,
+        @NotBlank String block,
         @NotNull BrigadierRole role,
         @NotBlank String phone,
         String email,

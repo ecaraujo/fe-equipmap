@@ -19,4 +19,18 @@ public interface ApartmentRepository extends JpaRepository<Apartment, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from Apartment a where a.condominiumId = :condominiumId and a.deletedAt is null order by a.block asc, a.unit asc")
     List<Apartment> findActiveForUpdate(@Param("condominiumId") UUID condominiumId);
+
+    @Query("""
+            select count(a) > 0
+            from Apartment a
+            where a.condominiumId = :condominiumId
+              and lower(a.unit) = lower(:unit)
+              and lower(a.block) = lower(:block)
+              and a.deletedAt is null
+              and (:excludedId is null or a.id <> :excludedId)
+            """)
+    boolean existsActiveUnitBlock(@Param("condominiumId") UUID condominiumId,
+                                  @Param("unit") String unit,
+                                  @Param("block") String block,
+                                  @Param("excludedId") UUID excludedId);
 }

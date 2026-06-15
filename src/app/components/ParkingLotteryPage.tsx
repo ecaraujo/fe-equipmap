@@ -5,14 +5,11 @@ import {
   Trash2,
   Edit,
   Car,
-  User,
-  Phone,
   Shuffle,
   Trophy,
   Search,
   CheckCircle2,
   Building,
-  Hash,
   Download,
   RefreshCw,
   AlertCircle,
@@ -38,6 +35,8 @@ import {
 } from "./ui/select";
 import { cn } from "./ui/utils";
 import { useParking } from "../../hooks/useParking";
+import { ApartmentFormDialog } from "./ApartmentFormDialog";
+import { ApartmentTable } from "./ApartmentTable";
 import type {
   Apartment,
   ParkingSpot,
@@ -78,7 +77,6 @@ export function ParkingLotteryPage() {
   const [editingApt, setEditingApt] = useState<Apartment | null>(null);
   const [editingSpot, setEditingSpot] = useState<ParkingSpot | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [newApt, setNewApt] = useState<Partial<CreateApartmentDto>>({ hasVehicle: true, block: "A" });
   const [newSpot, setNewSpot] = useState<Partial<CreateSpotDto>>({ type: "Padrão", covered: false });
 
   const eligibleApts = apartments.filter((a) => a.hasVehicle && !results.find((r) => r.apartmentId === a.id));
@@ -104,17 +102,6 @@ export function ParkingLotteryPage() {
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Nao foi possivel resetar o sorteio.");
     }
-  };
-
-  const handleSaveApt = async () => {
-    if (editingApt) {
-      await updateApartment(editingApt.id, newApt as UpdateApartmentDto);
-    } else {
-      await createApartment(newApt as CreateApartmentDto);
-    }
-    setShowAptModal(false);
-    setEditingApt(null);
-    setNewApt({ hasVehicle: true, block: "A" });
   };
 
   const handleSaveSpot = async () => {
@@ -217,7 +204,7 @@ export function ParkingLotteryPage() {
                 <Input placeholder="Buscar..." className="pl-8 h-8 text-sm w-48" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
               {activeTab === "apartments" && (
-                <Button size="sm" className="h-8 bg-blue-700 hover:bg-blue-800 text-white gap-1.5" onClick={() => { setEditingApt(null); setNewApt({ hasVehicle: true, block: "A" }); setShowAptModal(true); }}>
+                <Button size="sm" className="h-8 bg-blue-700 hover:bg-blue-800 text-white gap-1.5" onClick={() => { setEditingApt(null); setShowAptModal(true); }}>
                   <Plus className="w-3.5 h-3.5" /> Apartamento
                 </Button>
               )}
@@ -231,93 +218,13 @@ export function ParkingLotteryPage() {
 
           {/* Apartments tab */}
           <TabsContent value="apartments" className="m-0">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Unidade</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Responsável</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden sm:table-cell">Telefone</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden md:table-cell">Andar</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Veículo</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Status sorteio</th>
-                    <th className="px-5 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filteredApts.map((apt) => {
-                    const result = results.find((r) => r.apartmentId === apt.id);
-                    return (
-                      <tr key={apt.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
-                              <span className="text-xs font-bold text-blue-700">{apt.block}</span>
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">Apto {apt.unit}</div>
-                              <div className="text-xs text-gray-400">Bloco {apt.block}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-1.5 text-sm text-gray-700">
-                            <User className="w-3.5 h-3.5 text-gray-400" />
-                            {apt.ownerName}
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5 hidden sm:table-cell">
-                          <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                            <Phone className="w-3.5 h-3.5 text-gray-400" />
-                            {apt.phone ?? "Nao informado"}
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5 hidden md:table-cell">
-                          <span className="text-sm text-gray-600">{apt.floor != null ? `${apt.floor}º andar` : "Nao informado"}</span>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border", apt.hasVehicle ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200")}>
-                            {apt.hasVehicle ? "Sim" : "Não"}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 hidden lg:table-cell">
-                          {result ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-green-600">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              Vaga {result.spotNumber}
-                            </span>
-                          ) : apt.hasVehicle ? (
-                            <span className="text-xs text-amber-500">Aguardando sorteio</span>
-                          ) : (
-                            <span className="text-xs text-gray-400">Não participa</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => { setEditingApt(apt); setNewApt(apt); setShowAptModal(true); }}
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 text-red-400 hover:text-red-600"
-                              onClick={() => removeApartment(apt.id)}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <ApartmentTable
+              apartments={filteredApts}
+              results={results}
+              showLotteryStatus
+              onEdit={(apt) => { setEditingApt(apt); setShowAptModal(true); }}
+              onDelete={(id) => removeApartment(id)}
+            />
           </TabsContent>
 
           {/* Spots tab */}
@@ -526,46 +433,19 @@ export function ParkingLotteryPage() {
       </Dialog>
 
       {/* Apartment Modal */}
-      <Dialog open={showAptModal} onOpenChange={setShowAptModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editingApt ? "Editar apartamento" : "Cadastrar apartamento"}</DialogTitle>
-            <DialogDescription>
-              Informe os dados operacionais usados pelo sorteio de vagas.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Unidade *</Label>
-                <Input placeholder="101" defaultValue={editingApt?.unit} onChange={(e) => setNewApt({ ...newApt, unit: e.target.value })} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Bloco</Label>
-                <Input placeholder="A" defaultValue={editingApt?.block || "A"} onChange={(e) => setNewApt({ ...newApt, block: e.target.value })} />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Responsável *</Label>
-              <Input placeholder="Nome completo" defaultValue={editingApt?.ownerName} onChange={(e) => setNewApt({ ...newApt, ownerName: e.target.value })} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Possui veículo?</Label>
-              <Select defaultValue={editingApt?.hasVehicle !== false ? "true" : "false"} onValueChange={(v) => setNewApt({ ...newApt, hasVehicle: v === "true" })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Sim — participa do sorteio</SelectItem>
-                  <SelectItem value="false">Não — não participa</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setShowAptModal(false)}>Cancelar</Button>
-            <Button className="bg-blue-700 hover:bg-blue-800 text-white" onClick={handleSaveApt}>Salvar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ApartmentFormDialog
+        open={showAptModal}
+        onOpenChange={setShowAptModal}
+        apartment={editingApt}
+        onSave={async (dto) => {
+          if (editingApt) {
+            await updateApartment(editingApt.id, dto as UpdateApartmentDto);
+          } else {
+            await createApartment(dto as CreateApartmentDto);
+          }
+          setEditingApt(null);
+        }}
+      />
 
       {/* Spot Modal */}
       <Dialog open={showSpotModal} onOpenChange={setShowSpotModal}>

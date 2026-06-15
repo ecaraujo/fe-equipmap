@@ -325,7 +325,11 @@ export function MaintenancePage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Data agendada *</Label>
-                <Input type="date" onChange={(e) => setNewRecord({ ...newRecord, scheduledDate: new Date(e.target.value).toLocaleDateString("pt-BR") })} />
+                <Input
+                  type="date"
+                  value={newRecord.scheduledDate ?? ""}
+                  onChange={(e) => setNewRecord({ ...newRecord, scheduledDate: e.target.value })}
+                />
               </div>
             </div>
             <div className="space-y-1.5">

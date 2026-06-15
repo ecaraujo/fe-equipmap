@@ -2,7 +2,7 @@ const BFF_URL = process.env.BFF_URL ?? "http://localhost:4000/graphql";
 const ADMIN_EMAIL = process.env.AUTH_SEED_ADMIN_EMAIL ?? "admin@equipmap.local";
 const ADMIN_PASSWORD = process.env.AUTH_SEED_ADMIN_PASSWORD ?? "admin123";
 
-async function graphql(query, variables = {}, token) {
+async function graphql(query, variables, token) {
   const response = await fetch(BFF_URL, {
     method: "POST",
     headers: {
@@ -10,7 +10,7 @@ async function graphql(query, variables = {}, token) {
       "x-trace-id": "equipmap-infra-smoke",
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ query, variables }),
+    body: JSON.stringify({ query, variables: variables ?? {} }),
   });
 
   const body = await response.json();

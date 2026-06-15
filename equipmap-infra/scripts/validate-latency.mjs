@@ -11,10 +11,10 @@
 const BFF_URL = process.env.BFF_URL ?? "http://localhost:4000/graphql";
 const ADMIN_EMAIL = process.env.AUTH_SEED_ADMIN_EMAIL ?? "admin@equipmap.local";
 const ADMIN_PASSWORD = process.env.AUTH_SEED_ADMIN_PASSWORD ?? "admin123";
-const ITERATIONS = parseInt(process.env.LATENCY_ITERATIONS ?? "100", 10);
-const P95_THRESHOLD_MS = parseInt(process.env.P95_THRESHOLD_MS ?? "500", 10);
+const ITERATIONS = Number.parseInt(process.env.LATENCY_ITERATIONS ?? "100", 10);
+const P95_THRESHOLD_MS = Number.parseInt(process.env.P95_THRESHOLD_MS ?? "500", 10);
 
-async function graphql(query, variables = {}, token) {
+async function graphql(query, variables, token) {
   const start = performance.now();
   const response = await fetch(BFF_URL, {
     method: "POST",
@@ -22,7 +22,7 @@ async function graphql(query, variables = {}, token) {
       "content-type": "application/json",
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ query, variables }),
+    body: JSON.stringify({ query, variables: variables ?? {} }),
   });
   await response.json();
   return performance.now() - start;
@@ -117,7 +117,7 @@ for (const q of queries) {
   }
 
   const s = stats(latencies);
-  const p95Pass = parseFloat(s.p95) <= P95_THRESHOLD_MS;
+  const p95Pass = Number.parseFloat(s.p95) <= P95_THRESHOLD_MS;
   const icon = p95Pass ? "✓" : "✗";
 
   console.log(`  ${icon} ${q.name}`);
@@ -132,7 +132,7 @@ const overall = stats(allLatencies);
 console.log(`\n  ─── Overall (${allLatencies.length} requests) ───`);
 console.log(`  min: ${overall.min}ms | avg: ${overall.avg}ms | p50: ${overall.p50}ms | p95: ${overall.p95}ms | p99: ${overall.p99}ms | max: ${overall.max}ms`);
 
-const overallP95 = parseFloat(overall.p95);
+const overallP95 = Number.parseFloat(overall.p95);
 console.log(`\n=== Result: p95 = ${overall.p95}ms ${overallP95 <= P95_THRESHOLD_MS ? "≤" : ">"} ${P95_THRESHOLD_MS}ms → ${overallP95 <= P95_THRESHOLD_MS ? "PASS ✓" : "FAIL ✗"} ===\n`);
 
 process.exit(allPassed && overallP95 <= P95_THRESHOLD_MS ? 0 : 1);

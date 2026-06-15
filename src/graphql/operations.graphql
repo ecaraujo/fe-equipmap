@@ -359,11 +359,20 @@ query ParkingData {
     id
     unit
     block
-    ownerName
-    phone
-    email
     floor
+    ownerName
+    ownerDocument
+    ownerPhone
+    ownerEmail
+    isRented
+    tenantName
+    tenantDocument
+    tenantPhone
+    tenantEmail
+    rentalStart
+    rentalEnd
     hasVehicle
+    observations
     createdAt
     updatedAt
     createdBy
@@ -417,11 +426,20 @@ mutation CreateParkingApartment($input: CreateApartmentInput!) {
     id
     unit
     block
-    ownerName
-    phone
-    email
     floor
+    ownerName
+    ownerDocument
+    ownerPhone
+    ownerEmail
+    isRented
+    tenantName
+    tenantDocument
+    tenantPhone
+    tenantEmail
+    rentalStart
+    rentalEnd
     hasVehicle
+    observations
     createdAt
     updatedAt
     createdBy
@@ -433,11 +451,20 @@ mutation UpdateParkingApartment($id: ID!, $input: UpdateApartmentInput!) {
     id
     unit
     block
-    ownerName
-    phone
-    email
     floor
+    ownerName
+    ownerDocument
+    ownerPhone
+    ownerEmail
+    isRented
+    tenantName
+    tenantDocument
+    tenantPhone
+    tenantEmail
+    rentalStart
+    rentalEnd
     hasVehicle
+    observations
     createdAt
     updatedAt
     createdBy
@@ -446,6 +473,85 @@ mutation UpdateParkingApartment($id: ID!, $input: UpdateApartmentInput!) {
 
 mutation DeleteParkingApartment($id: ID!) {
   deleteParkingApartment(id: $id)
+}
+
+query Apartments {
+  apartments {
+    id
+    unit
+    block
+    floor
+    ownerName
+    ownerDocument
+    ownerPhone
+    ownerEmail
+    isRented
+    tenantName
+    tenantDocument
+    tenantPhone
+    tenantEmail
+    rentalStart
+    rentalEnd
+    hasVehicle
+    observations
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+mutation CreateApartment($input: CreateApartmentInput!) {
+  createApartment(input: $input) {
+    id
+    unit
+    block
+    floor
+    ownerName
+    ownerDocument
+    ownerPhone
+    ownerEmail
+    isRented
+    tenantName
+    tenantDocument
+    tenantPhone
+    tenantEmail
+    rentalStart
+    rentalEnd
+    hasVehicle
+    observations
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+mutation UpdateApartment($id: ID!, $input: UpdateApartmentInput!) {
+  updateApartment(id: $id, input: $input) {
+    id
+    unit
+    block
+    floor
+    ownerName
+    ownerDocument
+    ownerPhone
+    ownerEmail
+    isRented
+    tenantName
+    tenantDocument
+    tenantPhone
+    tenantEmail
+    rentalStart
+    rentalEnd
+    hasVehicle
+    observations
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+
+mutation DeleteApartment($id: ID!) {
+  deleteApartment(id: $id)
 }
 
 mutation CreateParkingSpot($input: CreateParkingSpotInput!) {

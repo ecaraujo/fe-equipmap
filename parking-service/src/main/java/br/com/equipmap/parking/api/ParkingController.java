@@ -26,26 +26,26 @@ public class ParkingController {
         this.principalResolver = principalResolver;
     }
 
-    @Operation(summary = "List apartments")
+    @Operation(summary = "List apartments", description = "Returns active apartment units with owner, tenant, rental, contact, vehicle, and audit data for the caller condominium.")
     @GetMapping("/apartments")
     public List<ApartmentResponse> listApartments(HttpServletRequest request) {
         return service.listApartments(principal(request));
     }
 
-    @Operation(summary = "Create apartment")
+    @Operation(summary = "Create apartment", description = "Creates an active apartment unit. The pair condominium, unit, and block must be unique among active units.")
     @PostMapping("/apartments")
     @ResponseStatus(HttpStatus.CREATED)
     public ApartmentResponse createApartment(HttpServletRequest request, @Valid @RequestBody CreateApartmentRequest body) {
         return service.createApartment(principal(request), body);
     }
 
-    @Operation(summary = "Update apartment")
+    @Operation(summary = "Update apartment", description = "Updates apartment unit registration fields while preserving parking lottery compatibility.")
     @PutMapping("/apartments/{id}")
     public ApartmentResponse updateApartment(HttpServletRequest request, @PathVariable UUID id, @Valid @RequestBody UpdateApartmentRequest body) {
         return service.updateApartment(principal(request), id, body);
     }
 
-    @Operation(summary = "Soft delete apartment")
+    @Operation(summary = "Soft delete apartment", description = "Soft deletes the apartment unit without deleting historical lottery snapshots.")
     @DeleteMapping("/apartments/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteApartment(HttpServletRequest request, @PathVariable UUID id) {

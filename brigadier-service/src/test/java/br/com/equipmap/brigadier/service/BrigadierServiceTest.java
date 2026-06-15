@@ -66,6 +66,8 @@ class BrigadierServiceTest {
         List<BrigadierResponse> chiefs = service.list(admin(), null, BrigadierRole.CHIEF, CertificationStatus.EXPIRING);
 
         assertThat(expiring.certificationStatus()).isEqualTo(CertificationStatus.EXPIRING);
+        assertThat(expiring.apartment()).isEqualTo("101");
+        assertThat(expiring.block()).isEqualTo("A");
         assertThat(chiefs).extracting(BrigadierResponse::id).containsExactly(expiring.id());
     }
 
@@ -142,6 +144,6 @@ class BrigadierServiceTest {
 
     private CreateBrigadierRequest validCreate(String name, BrigadierRole role, boolean active, LocalDate expiry, String phone) {
         LocalDate date = LocalDate.now();
-        return new CreateBrigadierRequest(name, role, phone, name.toLowerCase() + "@example.com", active, date, expiry, null);
+        return new CreateBrigadierRequest(name, "101", "A", role, phone, name.toLowerCase() + "@example.com", active, date, expiry, null);
     }
 }

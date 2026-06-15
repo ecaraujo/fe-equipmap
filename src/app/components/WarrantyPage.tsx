@@ -29,6 +29,7 @@ import {
 import { Label } from "./ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { useWarranty } from "../../hooks/useWarranty";
+import { formatPhone, onlyDigits } from "../../utils/format";
 import type { CreateWarrantyDto, Warranty } from "../../graphql/models";
 
 const serviceWarrantyType = "Servi\u00e7o" as Warranty["type"];
@@ -77,6 +78,12 @@ function monthsBetween(startIso: string, endIso: string): number {
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return "Nao foi possivel cadastrar a garantia.";
+}
+
+function formatSupplierContact(value: string): string {
+  const hasEmailChars = /[@a-zA-Z]/.test(value);
+  if (hasEmailChars) return value;
+  return onlyDigits(value) ? formatPhone(value) : value;
 }
 
 const statusConfig: Record<string, { className: string; icon: ElementType; progressColor: string }> = {
@@ -405,7 +412,11 @@ export function WarrantyPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Contato do fornecedor</Label>
-              <Input value={newWarranty.supplierContact ?? ""} placeholder="Telefone ou e-mail" onChange={(event) => setNewWarranty({ ...newWarranty, supplierContact: event.target.value })} />
+              <Input
+                value={newWarranty.supplierContact ?? ""}
+                placeholder="(11)99999-0000 ou e-mail"
+                onChange={(event) => setNewWarranty({ ...newWarranty, supplierContact: formatSupplierContact(event.target.value) })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Data de compra *</Label>

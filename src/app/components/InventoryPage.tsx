@@ -560,9 +560,7 @@ export function InventoryPage() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingEquipment ? "Editar equipamento" : "Cadastrar novo equipamento"}</DialogTitle>
-            <DialogDescription>
-              {editingEquipment ? "Atualize o cadastro no backend." : "Cadastre um equipamento no backend."}
-            </DialogDescription>
+            <DialogDescription className="sr-only">Formulario de equipamento.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 mt-2">
             <div className="col-span-2 space-y-1.5">

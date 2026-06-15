@@ -56,7 +56,7 @@ public class BrigadierService {
     public BrigadierResponse create(RequestPrincipal principal, CreateBrigadierRequest request) {
         requireWrite(principal);
         validateDates(request.certificationDate(), request.certificationExpiry());
-        Brigadier brigadier = new Brigadier(principal.condominiumId(), request.name(), request.role(), request.phone(), request.email(),
+        Brigadier brigadier = new Brigadier(principal.condominiumId(), request.name(), request.apartment(), request.block(), request.role(), request.phone(), request.email(),
                 request.active(), request.certificationDate(), request.certificationExpiry(), request.notes());
         return BrigadierResponse.from(brigadierRepository.save(brigadier), LocalDate.now(), expiringWindowDays);
     }
@@ -68,7 +68,7 @@ public class BrigadierService {
         LocalDate date = request.certificationDate() == null ? brigadier.getCertificationDate() : request.certificationDate();
         LocalDate expiry = request.certificationExpiry() == null ? brigadier.getCertificationExpiry() : request.certificationExpiry();
         validateDates(date, expiry);
-        brigadier.update(request.name(), request.role(), request.phone(), request.email(), request.active(), request.certificationDate(), request.certificationExpiry(), request.notes());
+        brigadier.update(request.name(), request.apartment(), request.block(), request.role(), request.phone(), request.email(), request.active(), request.certificationDate(), request.certificationExpiry(), request.notes());
         return BrigadierResponse.from(brigadier, LocalDate.now(), expiringWindowDays);
     }
 

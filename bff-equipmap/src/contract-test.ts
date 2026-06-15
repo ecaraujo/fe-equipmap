@@ -222,6 +222,77 @@ const notification = await startStub(18088, {
   }),
 });
 
+const parking = await startStub(18086, {
+  "GET /parking/apartments": () => ({
+    body: [
+      {
+        id: "apt-001",
+        condominiumId: "22222222-2222-2222-2222-222222222222",
+        unit: "101",
+        block: "A",
+        floor: 1,
+        ownerName: "Maria Silva",
+        ownerDocument: "12345678900",
+        ownerPhone: "11999998888",
+        ownerEmail: "maria@example.com",
+        isRented: true,
+        tenantName: "Joao Santos",
+        tenantDocument: "98765432100",
+        tenantPhone: "11977776666",
+        tenantEmail: "joao@example.com",
+        rentalStart: "2026-01-01",
+        rentalEnd: "2026-12-31",
+        hasVehicle: true,
+        observations: "Unit with balcony",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ],
+  }),
+  "POST /parking/apartments": (_req, raw) => {
+    const input = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      status: 201,
+      body: {
+        id: "apt-new",
+        condominiumId: "22222222-2222-2222-2222-222222222222",
+        ...input,
+        createdAt: "2026-06-01T00:00:00.000Z",
+        updatedAt: "2026-06-01T00:00:00.000Z",
+      },
+    };
+  },
+  "PUT /parking/apartments/apt-001": (_req, raw) => {
+    const input = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      body: {
+        id: "apt-001",
+        condominiumId: "22222222-2222-2222-2222-222222222222",
+        unit: "101",
+        block: "A",
+        floor: 1,
+        ownerName: "Maria Silva",
+        ownerDocument: "12345678900",
+        ownerPhone: "11999998888",
+        ownerEmail: "maria@example.com",
+        isRented: true,
+        tenantName: "Joao Santos",
+        tenantDocument: "98765432100",
+        tenantPhone: "11977776666",
+        tenantEmail: "joao@example.com",
+        rentalStart: "2026-01-01",
+        rentalEnd: "2026-12-31",
+        hasVehicle: true,
+        observations: "Unit with balcony",
+        ...input,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-06-01T00:00:00.000Z",
+      },
+    };
+  },
+  "DELETE /parking/apartments/apt-001": () => ({ status: 204, body: null }),
+});
+
 try {
   const { resolvers } = await import("./resolvers.js");
   const { typeDefs } = await import("./schema.js");
@@ -320,6 +391,153 @@ try {
     throw new Error(`Dashboard summary values are incorrect: ${JSON.stringify(summary)}`);
   }
 
+  // Apartment contract: parkingApartments query (backward compat)
+  const parkingApartments = await server.executeOperation(
+    {
+      query: `#graphql
+        query parkingApartments {
+          parkingApartments {
+            id unit block floor ownerName ownerDocument ownerPhone ownerEmail
+            isRented tenantName tenantDocument tenantPhone tenantEmail
+            rentalStart rentalEnd hasVehicle observations createdAt updatedAt
+          }
+        }
+      `,
+    },
+    { contextValue: withDataSources(realContext(token)) },
+  );
+
+  if (parkingApartments.body.kind !== "single" || parkingApartments.body.singleResult.errors?.length) {
+    throw new Error(`parkingApartments contract failed: ${JSON.stringify(parkingApartments.body)}`);
+  }
+
+  const aptList = (parkingApartments.body.singleResult.data?.parkingApartments as Record<string, unknown>[]);
+  if (aptList.length !== 1 || aptList[0].ownerName !== "Maria Silva" || aptList[0].isRented !== true
+      || aptList[0].tenantName !== "Joao Santos" || aptList[0].hasVehicle !== true
+      || aptList[0].ownerPhone !== "11999998888" || aptList[0].observations !== "Unit with balcony") {
+    throw new Error(`parkingApartments data mismatch: ${JSON.stringify(aptList)}`);
+  }
+
+  // Apartment contract: semantic apartments query alias
+  const apartments = await server.executeOperation(
+    {
+      query: `#graphql
+        query apartments {
+          apartments {
+            id unit block ownerName isRented hasVehicle
+          }
+        }
+      `,
+    },
+    { contextValue: withDataSources(realContext(token)) },
+  );
+
+  if (apartments.body.kind !== "single" || apartments.body.singleResult.errors?.length) {
+    throw new Error(`apartments alias contract failed: ${JSON.stringify(apartments.body)}`);
+  }
+
+  // Apartment contract: createApartment mutation
+  const createApt = await server.executeOperation(
+    {
+      query: `#graphql
+        mutation createApartment($input: CreateApartmentInput!) {
+          createApartment(input: $input) {
+            id unit block ownerName ownerPhone isRented hasVehicle observations
+          }
+        }
+      `,
+      variables: {
+        input: {
+          unit: "202",
+          block: "B",
+          floor: 2,
+          ownerName: "Carlos Souza",
+          ownerPhone: "11988887777",
+          ownerEmail: "carlos@example.com",
+          isRented: false,
+          hasVehicle: true,
+          observations: "New unit",
+        },
+      },
+    },
+    { contextValue: withDataSources(realContext(token)) },
+  );
+
+  if (createApt.body.kind !== "single" || createApt.body.singleResult.errors?.length) {
+    throw new Error(`createApartment contract failed: ${JSON.stringify(createApt.body)}`);
+  }
+
+  const createdApt = createApt.body.singleResult.data?.createApartment as Record<string, unknown>;
+  if (createdApt.ownerName !== "Carlos Souza" || createdApt.unit !== "202" || createdApt.block !== "B") {
+    throw new Error(`createApartment response mismatch: ${JSON.stringify(createdApt)}`);
+  }
+
+  // Apartment contract: updateApartment mutation
+  const updateApt = await server.executeOperation(
+    {
+      query: `#graphql
+        mutation updateApartment($id: ID!, $input: UpdateApartmentInput!) {
+          updateApartment(id: $id, input: $input) {
+            id unit block ownerName observations
+          }
+        }
+      `,
+      variables: {
+        id: "apt-001",
+        input: { observations: "Updated observations" },
+      },
+    },
+    { contextValue: withDataSources(realContext(token)) },
+  );
+
+  if (updateApt.body.kind !== "single" || updateApt.body.singleResult.errors?.length) {
+    throw new Error(`updateApartment contract failed: ${JSON.stringify(updateApt.body)}`);
+  }
+
+  // Apartment contract: deleteApartment mutation
+  const deleteApt = await server.executeOperation(
+    {
+      query: `#graphql
+        mutation deleteApartment($id: ID!) {
+          deleteApartment(id: $id)
+        }
+      `,
+      variables: { id: "apt-001" },
+    },
+    { contextValue: withDataSources(realContext(token)) },
+  );
+
+  if (deleteApt.body.kind !== "single" || deleteApt.body.singleResult.errors?.length) {
+    throw new Error(`deleteApartment contract failed: ${JSON.stringify(deleteApt.body)}`);
+  }
+
+  // Apartment contract: createParkingApartment backward compat mutation
+  const createParkingApt = await server.executeOperation(
+    {
+      query: `#graphql
+        mutation createParkingApartment($input: CreateApartmentInput!) {
+          createParkingApartment(input: $input) {
+            id unit block ownerName hasVehicle
+          }
+        }
+      `,
+      variables: {
+        input: {
+          unit: "303",
+          block: "C",
+          ownerName: "Legacy User",
+          ownerPhone: "11966665555",
+          hasVehicle: false,
+        },
+      },
+    },
+    { contextValue: withDataSources(realContext(token)) },
+  );
+
+  if (createParkingApt.body.kind !== "single" || createParkingApt.body.singleResult.errors?.length) {
+    throw new Error(`createParkingApartment compat failed: ${JSON.stringify(createParkingApt.body)}`);
+  }
+
   await server.stop();
   console.log("BFF real-mode contract test passed.");
 } finally {
@@ -329,4 +547,5 @@ try {
   maintenance.close();
   warranty.close();
   notification.close();
+  parking.close();
 }

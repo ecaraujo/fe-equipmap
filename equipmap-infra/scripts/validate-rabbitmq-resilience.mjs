@@ -11,7 +11,7 @@
  * NOTE: This script requires Docker CLI access to stop/start the RabbitMQ container.
  */
 
-import { execSync } from "child_process";
+import { execSync } from "node:child_process";
 
 const BFF_URL = process.env.BFF_URL ?? "http://localhost:4000/graphql";
 const RABBITMQ_MGMT_URL = process.env.RABBITMQ_MGMT_URL ?? "http://localhost:15672";
@@ -34,14 +34,14 @@ function assert(condition, message) {
   }
 }
 
-async function graphql(query, variables = {}, token) {
+async function graphql(query, variables, token) {
   const response = await fetch(BFF_URL, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ query, variables }),
+    body: JSON.stringify({ query, variables: variables ?? {} }),
   });
   return response.json();
 }
@@ -61,18 +61,22 @@ async function waitForRabbitQueues(timeoutMs = 60000) {
 function dockerCmd(cmd) {
   try {
     return execSync(cmd, { encoding: "utf8", timeout: 30000 }).trim();
-  } catch (e) {
+  } catch (error) {
+    console.warn(`  Docker command failed: ${error.message}`);
     return null;
   }
 }
 
 async function getRabbitQueues() {
   try {
+    const credentials = Buffer.from(`${RABBITMQ_USER}:${RABBITMQ_PASS}`).toString("base64");
     const response = await fetch(`${RABBITMQ_MGMT_URL}/api/queues`, {
-      headers: { authorization: `Basic ${Buffer.from(`${RABBITMQ_USER}:${RABBITMQ_PASS}`).toString("base64")}` },
+      headers: { authorization: `Basic ${credentials}` },
     });
     if (response.ok) return response.json();
-  } catch { /* ignore */ }
+  } catch (error) {
+    console.warn(`  RabbitMQ management API unavailable: ${error.message}`);
+  }
   return [];
 }
 

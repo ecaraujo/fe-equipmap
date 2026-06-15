@@ -37,11 +37,20 @@ export type CompleteMaintenanceInput = {
 
 export type CreateApartmentInput = {
   block: string;
-  email?: string | null | undefined;
   floor?: number | null | undefined;
   hasVehicle: boolean;
+  isRented?: boolean | null | undefined;
+  observations?: string | null | undefined;
+  ownerDocument?: string | null | undefined;
+  ownerEmail?: string | null | undefined;
   ownerName: string;
-  phone?: string | null | undefined;
+  ownerPhone?: string | null | undefined;
+  rentalEnd?: string | null | undefined;
+  rentalStart?: string | null | undefined;
+  tenantDocument?: string | null | undefined;
+  tenantEmail?: string | null | undefined;
+  tenantName?: string | null | undefined;
+  tenantPhone?: string | null | undefined;
   unit: string;
 };
 
@@ -191,11 +200,20 @@ export type Role =
 
 export type UpdateApartmentInput = {
   block?: string | null | undefined;
-  email?: string | null | undefined;
   floor?: number | null | undefined;
   hasVehicle?: boolean | null | undefined;
+  isRented?: boolean | null | undefined;
+  observations?: string | null | undefined;
+  ownerDocument?: string | null | undefined;
+  ownerEmail?: string | null | undefined;
   ownerName?: string | null | undefined;
-  phone?: string | null | undefined;
+  ownerPhone?: string | null | undefined;
+  rentalEnd?: string | null | undefined;
+  rentalStart?: string | null | undefined;
+  tenantDocument?: string | null | undefined;
+  tenantEmail?: string | null | undefined;
+  tenantName?: string | null | undefined;
+  tenantPhone?: string | null | undefined;
   unit?: string | null | undefined;
 };
 
@@ -362,14 +380,14 @@ export type CreateWarrantyMutation = { createWarranty: { id: string, equipment: 
 export type ParkingDataQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ParkingDataQuery = { parkingApartments: Array<{ id: string, unit: string, block: string, ownerName: string, phone: string | null, email: string | null, floor: number | null, hasVehicle: boolean, createdAt: string, updatedAt: string, createdBy: string | null }>, parkingSpots: Array<{ id: string, number: string, type: ParkingSpotType, typeLabel: string, covered: boolean, floor: string, assignedTo: string | null, createdAt: string, updatedAt: string, createdBy: string | null }>, parkingResults: Array<{ id: string, apartmentId: string, spotId: string, unit: string, block: string, ownerName: string, spotNumber: string, spotType: ParkingSpotType, spotTypeLabel: string, seed: number, drawnAt: string, createdAt: string, updatedAt: string, createdBy: string | null }>, lotterySessions: Array<{ id: string, seed: number, drawnAt: string, undrawnApartments: Array<{ id: string, unit: string, block: string, ownerName: string }>, results: Array<{ id: string }> }> };
+export type ParkingDataQuery = { parkingApartments: Array<{ id: string, unit: string, block: string, floor: number | null, ownerName: string, ownerDocument: string | null, ownerPhone: string | null, ownerEmail: string | null, isRented: boolean, tenantName: string | null, tenantDocument: string | null, tenantPhone: string | null, tenantEmail: string | null, rentalStart: string | null, rentalEnd: string | null, hasVehicle: boolean, observations: string | null, createdAt: string, updatedAt: string, createdBy: string | null }>, parkingSpots: Array<{ id: string, number: string, type: ParkingSpotType, typeLabel: string, covered: boolean, floor: string, assignedTo: string | null, createdAt: string, updatedAt: string, createdBy: string | null }>, parkingResults: Array<{ id: string, apartmentId: string, spotId: string, unit: string, block: string, ownerName: string, spotNumber: string, spotType: ParkingSpotType, spotTypeLabel: string, seed: number, drawnAt: string, createdAt: string, updatedAt: string, createdBy: string | null }>, lotterySessions: Array<{ id: string, seed: number, drawnAt: string, undrawnApartments: Array<{ id: string, unit: string, block: string, ownerName: string }>, results: Array<{ id: string }> }> };
 
 export type CreateParkingApartmentMutationVariables = Exact<{
   input: CreateApartmentInput;
 }>;
 
 
-export type CreateParkingApartmentMutation = { createParkingApartment: { id: string, unit: string, block: string, ownerName: string, phone: string | null, email: string | null, floor: number | null, hasVehicle: boolean, createdAt: string, updatedAt: string, createdBy: string | null } };
+export type CreateParkingApartmentMutation = { createParkingApartment: { id: string, unit: string, block: string, floor: number | null, ownerName: string, ownerDocument: string | null, ownerPhone: string | null, ownerEmail: string | null, isRented: boolean, tenantName: string | null, tenantDocument: string | null, tenantPhone: string | null, tenantEmail: string | null, rentalStart: string | null, rentalEnd: string | null, hasVehicle: boolean, observations: string | null, createdAt: string, updatedAt: string, createdBy: string | null } };
 
 export type UpdateParkingApartmentMutationVariables = Exact<{
   id: string | number;
@@ -377,7 +395,7 @@ export type UpdateParkingApartmentMutationVariables = Exact<{
 }>;
 
 
-export type UpdateParkingApartmentMutation = { updateParkingApartment: { id: string, unit: string, block: string, ownerName: string, phone: string | null, email: string | null, floor: number | null, hasVehicle: boolean, createdAt: string, updatedAt: string, createdBy: string | null } };
+export type UpdateParkingApartmentMutation = { updateParkingApartment: { id: string, unit: string, block: string, floor: number | null, ownerName: string, ownerDocument: string | null, ownerPhone: string | null, ownerEmail: string | null, isRented: boolean, tenantName: string | null, tenantDocument: string | null, tenantPhone: string | null, tenantEmail: string | null, rentalStart: string | null, rentalEnd: string | null, hasVehicle: boolean, observations: string | null, createdAt: string, updatedAt: string, createdBy: string | null } };
 
 export type DeleteParkingApartmentMutationVariables = Exact<{
   id: string | number;
@@ -385,6 +403,33 @@ export type DeleteParkingApartmentMutationVariables = Exact<{
 
 
 export type DeleteParkingApartmentMutation = { deleteParkingApartment: boolean };
+
+export type ApartmentsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ApartmentsQuery = { apartments: Array<{ id: string, unit: string, block: string, floor: number | null, ownerName: string, ownerDocument: string | null, ownerPhone: string | null, ownerEmail: string | null, isRented: boolean, tenantName: string | null, tenantDocument: string | null, tenantPhone: string | null, tenantEmail: string | null, rentalStart: string | null, rentalEnd: string | null, hasVehicle: boolean, observations: string | null, createdAt: string, updatedAt: string, createdBy: string | null }> };
+
+export type CreateApartmentMutationVariables = Exact<{
+  input: CreateApartmentInput;
+}>;
+
+
+export type CreateApartmentMutation = { createApartment: { id: string, unit: string, block: string, floor: number | null, ownerName: string, ownerDocument: string | null, ownerPhone: string | null, ownerEmail: string | null, isRented: boolean, tenantName: string | null, tenantDocument: string | null, tenantPhone: string | null, tenantEmail: string | null, rentalStart: string | null, rentalEnd: string | null, hasVehicle: boolean, observations: string | null, createdAt: string, updatedAt: string, createdBy: string | null } };
+
+export type UpdateApartmentMutationVariables = Exact<{
+  id: string | number;
+  input: UpdateApartmentInput;
+}>;
+
+
+export type UpdateApartmentMutation = { updateApartment: { id: string, unit: string, block: string, floor: number | null, ownerName: string, ownerDocument: string | null, ownerPhone: string | null, ownerEmail: string | null, isRented: boolean, tenantName: string | null, tenantDocument: string | null, tenantPhone: string | null, tenantEmail: string | null, rentalStart: string | null, rentalEnd: string | null, hasVehicle: boolean, observations: string | null, createdAt: string, updatedAt: string, createdBy: string | null } };
+
+export type DeleteApartmentMutationVariables = Exact<{
+  id: string | number;
+}>;
+
+
+export type DeleteApartmentMutation = { deleteApartment: boolean };
 
 export type CreateParkingSpotMutationVariables = Exact<{
   input: CreateParkingSpotInput;
@@ -1319,11 +1364,20 @@ export const ParkingDataDocument = gql`
     id
     unit
     block
-    ownerName
-    phone
-    email
     floor
+    ownerName
+    ownerDocument
+    ownerPhone
+    ownerEmail
+    isRented
+    tenantName
+    tenantDocument
+    tenantPhone
+    tenantEmail
+    rentalStart
+    rentalEnd
     hasVehicle
+    observations
     createdAt
     updatedAt
     createdBy
@@ -1413,11 +1467,20 @@ export const CreateParkingApartmentDocument = gql`
     id
     unit
     block
-    ownerName
-    phone
-    email
     floor
+    ownerName
+    ownerDocument
+    ownerPhone
+    ownerEmail
+    isRented
+    tenantName
+    tenantDocument
+    tenantPhone
+    tenantEmail
+    rentalStart
+    rentalEnd
     hasVehicle
+    observations
     createdAt
     updatedAt
     createdBy
@@ -1456,11 +1519,20 @@ export const UpdateParkingApartmentDocument = gql`
     id
     unit
     block
-    ownerName
-    phone
-    email
     floor
+    ownerName
+    ownerDocument
+    ownerPhone
+    ownerEmail
+    isRented
+    tenantName
+    tenantDocument
+    tenantPhone
+    tenantEmail
+    rentalStart
+    rentalEnd
     hasVehicle
+    observations
     createdAt
     updatedAt
     createdBy
@@ -1525,6 +1597,203 @@ export function useDeleteParkingApartmentMutation(baseOptions?: ApolloReactHooks
 export type DeleteParkingApartmentMutationHookResult = ReturnType<typeof useDeleteParkingApartmentMutation>;
 export type DeleteParkingApartmentMutationResult = Apollo.MutationResult<DeleteParkingApartmentMutation>;
 export type DeleteParkingApartmentMutationOptions = Apollo.BaseMutationOptions<DeleteParkingApartmentMutation, DeleteParkingApartmentMutationVariables>;
+export const ApartmentsDocument = gql`
+    query Apartments {
+  apartments {
+    id
+    unit
+    block
+    floor
+    ownerName
+    ownerDocument
+    ownerPhone
+    ownerEmail
+    isRented
+    tenantName
+    tenantDocument
+    tenantPhone
+    tenantEmail
+    rentalStart
+    rentalEnd
+    hasVehicle
+    observations
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+    `;
+
+/**
+ * __useApartmentsQuery__
+ *
+ * To run a query within a React component, call `useApartmentsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useApartmentsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useApartmentsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useApartmentsQuery(baseOptions?: ApolloReactHooks.QueryHookOptions<ApartmentsQuery, ApartmentsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useQuery<ApartmentsQuery, ApartmentsQueryVariables>(ApartmentsDocument, options);
+      }
+export function useApartmentsLazyQuery(baseOptions?: ApolloReactHooks.LazyQueryHookOptions<ApartmentsQuery, ApartmentsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useLazyQuery<ApartmentsQuery, ApartmentsQueryVariables>(ApartmentsDocument, options);
+        }
+// @ts-ignore
+export function useApartmentsSuspenseQuery(baseOptions?: ApolloReactHooks.SuspenseQueryHookOptions<ApartmentsQuery, ApartmentsQueryVariables>): ApolloReactHooks.UseSuspenseQueryResult<ApartmentsQuery, ApartmentsQueryVariables>;
+export function useApartmentsSuspenseQuery(baseOptions?: ApolloReactHooks.SkipToken | ApolloReactHooks.SuspenseQueryHookOptions<ApartmentsQuery, ApartmentsQueryVariables>): ApolloReactHooks.UseSuspenseQueryResult<ApartmentsQuery | undefined, ApartmentsQueryVariables>;
+export function useApartmentsSuspenseQuery(baseOptions?: ApolloReactHooks.SkipToken | ApolloReactHooks.SuspenseQueryHookOptions<ApartmentsQuery, ApartmentsQueryVariables>) {
+          const options = baseOptions === ApolloReactHooks.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return ApolloReactHooks.useSuspenseQuery<ApartmentsQuery, ApartmentsQueryVariables>(ApartmentsDocument, options);
+        }
+export type ApartmentsQueryHookResult = ReturnType<typeof useApartmentsQuery>;
+export type ApartmentsLazyQueryHookResult = ReturnType<typeof useApartmentsLazyQuery>;
+export type ApartmentsSuspenseQueryHookResult = ReturnType<typeof useApartmentsSuspenseQuery>;
+export type ApartmentsQueryResult = Apollo.QueryResult<ApartmentsQuery, ApartmentsQueryVariables>;
+export const CreateApartmentDocument = gql`
+    mutation CreateApartment($input: CreateApartmentInput!) {
+  createApartment(input: $input) {
+    id
+    unit
+    block
+    floor
+    ownerName
+    ownerDocument
+    ownerPhone
+    ownerEmail
+    isRented
+    tenantName
+    tenantDocument
+    tenantPhone
+    tenantEmail
+    rentalStart
+    rentalEnd
+    hasVehicle
+    observations
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+    `;
+export type CreateApartmentMutationFn = Apollo.MutationFunction<CreateApartmentMutation, CreateApartmentMutationVariables>;
+
+/**
+ * __useCreateApartmentMutation__
+ *
+ * To run a mutation, you first call `useCreateApartmentMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateApartmentMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createApartmentMutation, { data, loading, error }] = useCreateApartmentMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCreateApartmentMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<CreateApartmentMutation, CreateApartmentMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<CreateApartmentMutation, CreateApartmentMutationVariables>(CreateApartmentDocument, options);
+      }
+export type CreateApartmentMutationHookResult = ReturnType<typeof useCreateApartmentMutation>;
+export type CreateApartmentMutationResult = Apollo.MutationResult<CreateApartmentMutation>;
+export type CreateApartmentMutationOptions = Apollo.BaseMutationOptions<CreateApartmentMutation, CreateApartmentMutationVariables>;
+export const UpdateApartmentDocument = gql`
+    mutation UpdateApartment($id: ID!, $input: UpdateApartmentInput!) {
+  updateApartment(id: $id, input: $input) {
+    id
+    unit
+    block
+    floor
+    ownerName
+    ownerDocument
+    ownerPhone
+    ownerEmail
+    isRented
+    tenantName
+    tenantDocument
+    tenantPhone
+    tenantEmail
+    rentalStart
+    rentalEnd
+    hasVehicle
+    observations
+    createdAt
+    updatedAt
+    createdBy
+  }
+}
+    `;
+export type UpdateApartmentMutationFn = Apollo.MutationFunction<UpdateApartmentMutation, UpdateApartmentMutationVariables>;
+
+/**
+ * __useUpdateApartmentMutation__
+ *
+ * To run a mutation, you first call `useUpdateApartmentMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateApartmentMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateApartmentMutation, { data, loading, error }] = useUpdateApartmentMutation({
+ *   variables: {
+ *      id: // value for 'id'
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateApartmentMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<UpdateApartmentMutation, UpdateApartmentMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<UpdateApartmentMutation, UpdateApartmentMutationVariables>(UpdateApartmentDocument, options);
+      }
+export type UpdateApartmentMutationHookResult = ReturnType<typeof useUpdateApartmentMutation>;
+export type UpdateApartmentMutationResult = Apollo.MutationResult<UpdateApartmentMutation>;
+export type UpdateApartmentMutationOptions = Apollo.BaseMutationOptions<UpdateApartmentMutation, UpdateApartmentMutationVariables>;
+export const DeleteApartmentDocument = gql`
+    mutation DeleteApartment($id: ID!) {
+  deleteApartment(id: $id)
+}
+    `;
+export type DeleteApartmentMutationFn = Apollo.MutationFunction<DeleteApartmentMutation, DeleteApartmentMutationVariables>;
+
+/**
+ * __useDeleteApartmentMutation__
+ *
+ * To run a mutation, you first call `useDeleteApartmentMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteApartmentMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteApartmentMutation, { data, loading, error }] = useDeleteApartmentMutation({
+ *   variables: {
+ *      id: // value for 'id'
+ *   },
+ * });
+ */
+export function useDeleteApartmentMutation(baseOptions?: ApolloReactHooks.MutationHookOptions<DeleteApartmentMutation, DeleteApartmentMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return ApolloReactHooks.useMutation<DeleteApartmentMutation, DeleteApartmentMutationVariables>(DeleteApartmentDocument, options);
+      }
+export type DeleteApartmentMutationHookResult = ReturnType<typeof useDeleteApartmentMutation>;
+export type DeleteApartmentMutationResult = Apollo.MutationResult<DeleteApartmentMutation>;
+export type DeleteApartmentMutationOptions = Apollo.BaseMutationOptions<DeleteApartmentMutation, DeleteApartmentMutationVariables>;
 export const CreateParkingSpotDocument = gql`
     mutation CreateParkingSpot($input: CreateParkingSpotInput!) {
   createParkingSpot(input: $input) {

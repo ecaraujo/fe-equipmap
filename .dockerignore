@@ -10,12 +10,13 @@ __figma__entrypoint__.ts
 # Plain JARs (avoid wildcard collisions)
 **/*-plain.jar
 
-# Build caches
-**/build/tmp/
+# Build caches and outputs (keep libs/ for JAR copy)
 **/build/classes/
 **/build/generated/
-**/build/resources/
 **/build/reports/
+**/build/resources/
+**/build/tmp/
+**/bin/
 **/.gradle/
 
 # IDE

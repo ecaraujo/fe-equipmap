@@ -33,12 +33,13 @@ import type {
   UpdateEquipmentDto,
   UpdateSpotDto,
 } from "./models";
+import { onlyDigits } from "../utils/format";
 
 function toIsoDate(value?: string | null): string {
   if (!value) return new Date().toISOString().slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const pt = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (pt) return `${pt[3]}-${pt[2]}-${pt[1]}`;
+  const pt = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (pt) return `${pt[3]}-${pt[2].padStart(2, "0")}-${pt[1].padStart(2, "0")}`;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? new Date().toISOString().slice(0, 10) : date.toISOString().slice(0, 10);
 }
@@ -104,6 +105,9 @@ const brigadierRoleMap: Record<string, BrigadierRole> = {
   Brigadista: "BRIGADIER",
   "Brigadista Chefe": "CHIEF",
   "Sub-Chefe": "DEPUTY_CHIEF",
+  BRIGADIER: "BRIGADIER",
+  CHIEF: "CHIEF",
+  DEPUTY_CHIEF: "DEPUTY_CHIEF",
 };
 
 const channelMap: Record<string, NotificationChannel> = {
@@ -197,11 +201,45 @@ export function toCreateWarrantyInput(dto: CreateWarrantyDto): CreateWarrantyInp
 }
 
 export function toCreateApartmentInput(dto: CreateApartmentDto): CreateApartmentInput {
-  return { ...dto };
+  return {
+    unit: dto.unit,
+    block: dto.block,
+    floor: dto.floor ?? undefined,
+    ownerName: dto.ownerName,
+    ownerDocument: dto.ownerDocument ?? undefined,
+    ownerPhone: dto.ownerPhone ? onlyDigits(dto.ownerPhone) : undefined,
+    ownerEmail: dto.ownerEmail ?? undefined,
+    isRented: dto.isRented ?? false,
+    tenantName: dto.tenantName ?? undefined,
+    tenantDocument: dto.tenantDocument ?? undefined,
+    tenantPhone: dto.tenantPhone ? onlyDigits(dto.tenantPhone) : undefined,
+    tenantEmail: dto.tenantEmail ?? undefined,
+    rentalStart: dto.rentalStart ? toIsoDate(dto.rentalStart) : undefined,
+    rentalEnd: dto.rentalEnd ? toIsoDate(dto.rentalEnd) : undefined,
+    hasVehicle: dto.hasVehicle,
+    observations: dto.observations ?? undefined,
+  };
 }
 
 export function toUpdateApartmentInput(dto: UpdateApartmentDto): UpdateApartmentInput {
-  return { ...dto };
+  return {
+    unit: dto.unit,
+    block: dto.block,
+    floor: dto.floor ?? undefined,
+    ownerName: dto.ownerName,
+    ownerDocument: dto.ownerDocument ?? undefined,
+    ownerPhone: dto.ownerPhone ? onlyDigits(dto.ownerPhone) : undefined,
+    ownerEmail: dto.ownerEmail ?? undefined,
+    isRented: dto.isRented,
+    tenantName: dto.tenantName ?? undefined,
+    tenantDocument: dto.tenantDocument ?? undefined,
+    tenantPhone: dto.tenantPhone ? onlyDigits(dto.tenantPhone) : undefined,
+    tenantEmail: dto.tenantEmail ?? undefined,
+    rentalStart: dto.rentalStart ? toIsoDate(dto.rentalStart) : undefined,
+    rentalEnd: dto.rentalEnd ? toIsoDate(dto.rentalEnd) : undefined,
+    hasVehicle: dto.hasVehicle,
+    observations: dto.observations ?? undefined,
+  };
 }
 
 export function toCreateSpotInput(dto: CreateSpotDto): CreateParkingSpotInput {
@@ -214,19 +252,31 @@ export function toUpdateSpotInput(dto: UpdateSpotDto): UpdateParkingSpotInput {
 
 export function toCreateBrigadierInput(dto: CreateBrigadierDto): CreateBrigadierInput {
   return {
-    ...dto,
+    name: dto.name,
+    apartment: dto.apartment,
+    block: dto.block,
+    phone: onlyDigits(dto.phone),
     role: requiredMappedValue(brigadierRoleMap, dto.role, "funcao do brigadista"),
     certificationDate: toIsoDate(dto.certificationDate),
     certificationExpiry: toIsoDate(dto.certificationExpiry),
+    certificationBody: dto.certificationBody,
+    active: dto.active,
+    observations: dto.observations,
   };
 }
 
 export function toUpdateBrigadierInput(dto: UpdateBrigadierDto): UpdateBrigadierInput {
   return {
-    ...dto,
+    name: dto.name,
+    apartment: dto.apartment,
+    block: dto.block,
+    phone: dto.phone ? onlyDigits(dto.phone) : undefined,
     role: optionalMappedValue(brigadierRoleMap, dto.role, "funcao do brigadista"),
     certificationDate: dto.certificationDate ? toIsoDate(dto.certificationDate) : undefined,
     certificationExpiry: dto.certificationExpiry ? toIsoDate(dto.certificationExpiry) : undefined,
+    certificationBody: dto.certificationBody,
+    active: dto.active,
+    observations: dto.observations,
   };
 }
 

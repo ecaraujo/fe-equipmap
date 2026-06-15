@@ -3,7 +3,7 @@ prd_number: "001"
 status: pronto
 priority: alta
 created: 2026-05-18
-updated: 2026-05-20
+updated: 2026-05-27
 issue: ""
 depends_on: []
 references:
@@ -77,6 +77,8 @@ Este PRD descreve a entrega do MVP backend integrado ao frontend existente, pres
 18. **Enums limpos no GraphQL + mapping no BFF.** Motivo: type-safety sobre conveniência; enums sem acentos/espaços; BFF mapeia para labels legíveis quando necessário.
 19. **Seed data via migration script (1 admin + 1 condomínio).** Motivo: bootstrap mínimo para primeiro login sem necessidade de setup manual.
 20. **Ajustes frontend distribuídos nos milestones (não milestone separado).** Motivo: cada milestone entrega ponta a ponta; frontend evolui junto com o backend correspondente.
+21. **Cadastro de apartamentos fica no `parking-service` no MVP, com duas entradas de UI.** Motivo: o serviço já possui a entidade `Apartment` usada pelo sorteio de vagas; a evolução correta é ampliar esse contrato para cadastro completo de unidades, proprietários e inquilinos, sem criar mock no frontend nem novo microserviço prematuro. O cadastro pode continuar acessível dentro de `Sorteio de Vagas`, mas também deve existir como módulo `Apartamentos` no menu principal para preparar modularização e comercialização separada após o MVP.
+22. **SonarCloud como gate por task implementada.** Motivo: cada mudança deve nascer limpa, sem acumular bugs, vulnerabilidades, security hotspots pendentes, code smells ou dívida técnica silenciosa. Toda task OpenSpec implementada deve incluir análise SonarCloud/SonarQube dos arquivos alterados e só pode ser marcada como concluída quando os alertas novos forem corrigidos ou justificados explicitamente no artefato da mudança.
 
 ### Fora do escopo
 
@@ -307,6 +309,44 @@ Como administrador do condomínio, quero cadastrar apartamentos e vagas e execut
 - Registrar seed como campo do `LotteryResult` para reprodutibilidade.
 - Transação PostgreSQL com `SERIALIZABLE` isolation level via `@Transactional(isolation = Isolation.SERIALIZABLE)`.
 
+### US06A: Gerenciar apartamentos e unidades do condomínio
+
+Como administrador do condomínio, quero cadastrar apartamentos/unidades com dados cadastrais e contatos do proprietário e do inquilino quando a unidade estiver alugada, para manter uma base operacional única usada pelo EquipMap e pelo sorteio de vagas.
+
+**Rules:**
+- O frontend deve exibir a opção `Apartamentos` no menu principal imediatamente abaixo de `Garantias`.
+- A tela `Apartamentos` deve consumir somente dados reais do BFF via Apollo Client; não pode ter arrays locais, seed/demo data ou fallback mockado.
+- O cadastro de apartamentos pode continuar disponível na tela `Sorteio de Vagas`, pois é necessário ao fluxo operacional de sorteio, mas deve reutilizar o mesmo contrato, mutations, validações e componentes base da nova tela `Apartamentos`.
+- A entrada `Apartamentos` deve funcionar como módulo independente de navegação e não depender da execução, configuração ou visibilidade do módulo `Sorteio de Vagas`, preparando separação comercial futura.
+- O BFF deve expor query de listagem e mutations de criação, edição e exclusão para apartamentos/unidades, podendo reutilizar `parkingApartments`, `createParkingApartment`, `updateParkingApartment` e `deleteParkingApartment` desde que o contrato seja ampliado para o cadastro completo.
+- O `parking-service` deve persistir, no mínimo: `unit`, `block`, `floor`, `ownerName`, `ownerDocument`, `ownerPhone`, `ownerEmail`, `isRented`, `tenantName`, `tenantDocument`, `tenantPhone`, `tenantEmail`, `rentalStart`, `rentalEnd`, `hasVehicle`, `observations`, `createdAt`, `updatedAt`, `createdBy`, `deletedAt` e `condominiumId`.
+- `unit` e `block` devem ser únicos por `condominiumId` entre registros ativos (`deletedAt IS NULL`).
+- `ownerName` e ao menos um contato do proprietário (`ownerPhone` ou `ownerEmail`) são obrigatórios.
+- Quando `isRented = true`, `tenantName` e ao menos um contato do inquilino (`tenantPhone` ou `tenantEmail`) são obrigatórios.
+- Quando `isRented = false`, campos de inquilino devem ser opcionais e não devem ser exibidos como obrigatórios no frontend.
+- Telefones devem ser exibidos no frontend com máscara `(xx)xxxxx-xxxx`, mas enviados ao BFF somente com dígitos.
+- Datas de contrato (`rentalStart`, `rentalEnd`) devem seguir o padrão do PRD para formulários: exibição `dd/MM/yyyy` e envio ao BFF/backend em ISO `yyyy-MM-dd`.
+- O campo `hasVehicle` continua determinando elegibilidade no sorteio de vagas; ele não deve ser removido do contrato de apartamento.
+- O BFF deve parar de descartar campos de apartamento como `phone`, `email`, `floor` ou os novos campos de proprietário/inquilino quando o `parking-service` passar a persisti-los.
+- O `dashboardSummary` ou query equivalente deve disponibilizar total de apartamentos caso o menu `Apartamentos` exiba badge; esse valor deve vir do BFF/backend, nunca de estado local.
+
+**Edge cases:**
+- Cadastro duplicado de `unit + block` no mesmo condomínio → retornar 409.
+- Usuário `viewer` tentando criar, editar ou excluir apartamento → retornar 403.
+- `rentalEnd` anterior a `rentalStart` → retornar 400.
+- `isRented = true` sem dados mínimos do inquilino → retornar 400 com campo inválido em `details`.
+- Telefone fora do padrão de 10 ou 11 dígitos após remover máscara → retornar 400.
+- Exclusão de apartamento já usado em resultado de sorteio deve ser soft delete; snapshots de sorteios anteriores devem continuar visíveis.
+- Apartamento sem veículo cadastrado continua aparecendo na tela `Apartamentos`, mas fica fora dos sorteios.
+
+**Notas de implementação:**
+- Evoluir a tabela `parking-service.apartments` via Flyway, preservando dados existentes (`owner` atual deve migrar para `ownerName`).
+- Manter o BFF como camada de orquestração e mapeamento GraphQL; regras de validação e persistência pertencem ao `parking-service`.
+- Atualizar `src/graphql/operations.graphql`, rodar `npm run codegen` e usar os hooks gerados; não editar `src/graphql/generated.tsx` manualmente.
+- Reaproveitar componentes de UI existentes e extrair o formulário/listagem de apartamentos para componentes compartilháveis entre `Apartamentos` e `Sorteio de Vagas`; evitar duplicar lógica de payload, validação e mutations.
+- Manter `Sorteio de Vagas` como consumidor do cadastro de apartamentos, não como dono exclusivo desse cadastro.
+- Ampliar testes do `parking-service`, BFF e frontend para validar roundtrip de proprietário/inquilino, unicidade, máscara de telefone e formato de datas.
+
 ### US07: Gerenciar brigadistas e notificações em massa
 
 Como gestor de segurança do condomínio, quero cadastrar brigadistas, acompanhar certificações e enviar comunicações em massa, para manter a brigada atualizada e acionável em emergências.
@@ -502,7 +542,7 @@ Integrações externas:
 
 | Critério | Método de verificação |
 |----------|----------------------|
-| Todos os endpoints descritos nas US01-US09 devem estar implementados e documentados em OpenAPI. | Revisão da especificação OpenAPI e execução de testes automatizados por endpoint. |
+| Todos os endpoints descritos nas US01-US09 e US06A devem estar implementados e documentados em OpenAPI. | Revisão da especificação OpenAPI e execução de testes automatizados por endpoint. |
 | APIs protegidas devem exigir `Authorization: Bearer <token>` com `condominiumId` no claim JWT. | Testes automatizados com token ausente, inválido, expirado, e com `condominiumId` divergente. |
 | RBAC deve bloquear escrita para `viewer` e permitir escrita para `admin` e `manager` conforme regras definidas. | Testes de autorização por role em endpoints `POST`, `PUT`, `PATCH` e `DELETE`. |
 | Dados devem ser isolados por `condominiumId` extraído do JWT. | Testes com usuários de condomínios diferentes tentando acessar o mesmo recurso. |
@@ -519,6 +559,7 @@ Integrações externas:
 | Tempo de resposta p95 ≤ 500ms para endpoints de consulta simples em homologação. | Teste de carga com dataset representativo. |
 | Frontend falha com erro claro quando `VITE_API_BASE_URL` vazio. | Teste de configuração sem variável obrigatória. |
 | Frontend consome backend real quando `VITE_API_BASE_URL` configurado. | Teste end-to-end com ambiente de homologação. |
+| Cada task OpenSpec implementada deve passar por análise SonarCloud/SonarQube sem novos bugs, vulnerabilidades, security hotspots pendentes, code smells ou debt introduzidos nos arquivos alterados. | Evidência no encerramento da task: print/link do SonarCloud, painel SonarQube local/IDE, ou saída equivalente do quality gate; qualquer falso positivo deve ser documentado com justificativa técnica e escopo. |
 
 ### De negócio
 
@@ -537,6 +578,14 @@ Integrações externas:
 - O mínimo aceitável define o corte de sucesso operacional; abaixo dele, a entrega deve ser considerada parcialmente malsucedida e exigir plano de correção.
 
 ## 6. Milestones
+
+### Regra transversal de qualidade por task
+
+- Toda task implementada em qualquer milestone deve incluir uma etapa final explícita de análise SonarCloud/SonarQube dos arquivos alterados.
+- A task não deve ser marcada como concluída enquanto houver alerta novo de bug, vulnerability, security hotspot, code smell, duplicação ou maintainability debt relacionado à alteração.
+- A revisão deve considerar frontend TypeScript/React, BFF Node/TypeScript, scripts JavaScript/MJS, Java/Spring Boot, SQL/Flyway e arquivos de configuração tocados na task.
+- Achados já existentes fora do escopo da task devem ser registrados como dívida conhecida, mas não podem ser usados para ignorar problemas introduzidos pela alteração atual.
+- Quando a análise local divergir do SonarCloud remoto, prevalece a regra mais restritiva até que a divergência seja esclarecida no artefato da mudança.
 
 ### Milestone 1: Preparar Fundação Técnica
 
@@ -609,13 +658,19 @@ Integrações externas:
 - Verificação: testes com datas simuladas + inspeção das notificações no frontend.
 - Aprovador: Product Owner + gestor operacional.
 
-### Milestone 4: Entregar Sorteio de Garagem
+### Milestone 4: Entregar Apartamentos e Sorteio de Garagem
 
-**Objetivo:** Automatizar o sorteio de vagas com persistência, atomicidade, seed auditável e registro de excedentes.
+**Objetivo:** Manter cadastro real de apartamentos/unidades com contatos de proprietário/inquilino e automatizar o sorteio de vagas com persistência, atomicidade, seed auditável e registro de excedentes.
 
-**Funcionalidades:** US06
+**Funcionalidades:** US06, US06A
 
-- [ ] Implementar `parking-service` (Spring Boot) com CRUD de apartamentos e vagas.
+- [ ] Implementar `parking-service` (Spring Boot) com CRUD de apartamentos/unidades e vagas.
+- [ ] Ampliar a entidade `Apartment` para persistir proprietário, contatos, inquilino quando alugado, andar, observações e campos de auditoria.
+- [ ] Implementar unicidade de `unit + block + condominiumId` para apartamentos ativos.
+- [ ] Expor no BFF os campos completos de apartamento sem descartar dados persistidos pelo `parking-service`.
+- [ ] **Frontend:** Criar página `Apartamentos` no menu principal abaixo de `Garantias`, consumindo Apollo Client e sem mock/fallback local.
+- [ ] **Frontend:** Manter cadastro de apartamentos acessível dentro de `Sorteio de Vagas`, reutilizando os mesmos componentes/contratos da página `Apartamentos`.
+- [ ] **Frontend:** Padronizar máscara de telefone `(xx)xxxxx-xxxx` e envio de datas ISO `yyyy-MM-dd` nos formulários de apartamentos.
 - [ ] Implementar execução transacional do sorteio com seed registrado (Fisher-Yates + `java.util.Random(seed)`).
 - [ ] Implementar `@Transactional(isolation = SERIALIZABLE)` para atomicidade.
 - [ ] Implementar persistência de `LotteryResult` com snapshots e campo `undrawnApartments`.
@@ -625,8 +680,8 @@ Integrações externas:
 - [ ] **Frontend:** Migrar hook `useParking` para Apollo Client; adaptar para novo tipo `LotterySession`.
 
 **Critério de conclusão:**
-- Condição: administrador consegue cadastrar apartamentos/vagas, executar sorteio reprodutível, visualizar resultados e verificar excedentes.
-- Verificação: teste transacional + teste de reprodutibilidade com mesmo seed + demo funcional.
+- Condição: administrador consegue cadastrar apartamentos/unidades com proprietário e inquilino quando alugado, cadastrar vagas, executar sorteio reprodutível, visualizar resultados e verificar excedentes.
+- Verificação: teste CRUD de apartamentos com proprietário/inquilino + teste transacional + teste de reprodutibilidade com mesmo seed + demo funcional.
 - Aprovador: Product Owner + administrador do condomínio.
 
 ### Milestone 5: Entregar Brigadistas e Comunicação em Massa
@@ -654,7 +709,7 @@ Integrações externas:
 
 **Objetivo:** Validar o fluxo completo do EquipMap com frontend real, backend, autenticação, multi-tenancy, persistência, eventos e notificações.
 
-**Funcionalidades:** US01, US02, US03, US04, US05, US06, US07, US08, US09
+**Funcionalidades:** US01, US02, US03, US04, US05, US06, US06A, US07, US08, US09
 
 - [ ] Executar testes end-to-end dos principais fluxos.
 - [ ] Validar RBAC por perfil (admin, manager, viewer).
@@ -745,3 +800,15 @@ Integrações externas:
 - **2026-05-19:** Ajustes frontend distribuídos nos milestones. Motivo: cada milestone entrega ponta a ponta.
 - **2026-05-19:** Entidades JPA modeladas: User, RefreshToken, Condominium, CondominiumUser, Equipment, OutboxEvent, MaintenanceRecord, Apartment, ParkingSpot, LotterySession, LotteryResult, Brigadier, NotificationLog. Motivo: design validado durante exploração arquitetural.
 - **2026-05-20:** Configuração de `graphql-codegen` no frontend não deve combinar `typescript` com `typescript-operations`/`typescript-react-apollo` no mesmo arquivo `src/graphql/generated.tsx` quando isso reemitir tipos base. Motivo: evitar declarações duplicadas de enums/tipos (`AppNotificationType`) que quebram o Vite/Babel; enums gerados devem ser consumidos como unions literais e mapeados por strings do schema.
+- **2026-05-27:** Cadastro de apartamentos/unidades deve virar módulo principal abaixo de `Garantias`, consumindo BFF/backend real e ampliando a entidade `Apartment` do `parking-service` com proprietário, contatos e inquilino quando alugado. O cadastro também permanece acessível dentro de `Sorteio de Vagas`, usando os mesmos componentes e mutations. Motivo: já existe domínio persistido usado pelo sorteio de vagas; ampliar o contrato evita duplicidade de fonte de dados, impede mock no frontend e prepara modularização/comercialização separada após o MVP.
+- **2026-05-27:** SonarCloud/SonarQube passa a ser gate obrigatório por task implementada. Motivo: evitar que novas features acumulem alertas, code smells, vulnerabilidades ou dívida técnica; cada task deve registrar análise e corrigir achados novos antes de ser marcada como concluída.
+Source: ISO 8601 (date/time), ISO 4217 (currency codes), IETF RFC 4122 (UUID), IETF BCP 47 (language tags). Apply to every API contract, database column, log field, and event payload across all stacks.
+
+| Data type | Standard | Canonical format | Example |
+|-----------|----------|-----------------|---------|
+| Date with time and timezone | ISO 8601 | `YYYY-MM-DDTHH:MM:SSZ` (UTC) or `+HH:MM` offset | `2026-03-18T14:30:00Z` |
+| Date without time | ISO 8601 | `YYYY-MM-DD` | `2026-03-18` |
+| Currency code | ISO 4217 | 3-letter uppercase alphabetic code | `BRL`, `USD` |
+| Currency amount | Decimal, no symbol | Decimal number, period separator | `199.90` |
+| Unique identifiers | UUID v4 (RFC 4122) | 8-4-4-4-12 hex groups, lowercase | `550e8400-e29b-41d4-a716-446655440000` |
+| Locale / language tag | BCP 47 | Language-Region | `pt-BR`, `en-US` |

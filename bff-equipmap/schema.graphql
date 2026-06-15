@@ -255,11 +255,20 @@ type Apartment implements Node & Auditable {
   condominiumId: ID!
   unit: String!
   block: String!
-  ownerName: String!
-  phone: String
-  email: String
   floor: Int
+  ownerName: String!
+  ownerDocument: String
+  ownerPhone: String
+  ownerEmail: String
+  isRented: Boolean!
+  tenantName: String
+  tenantDocument: String
+  tenantPhone: String
+  tenantEmail: String
+  rentalStart: DateTime
+  rentalEnd: DateTime
   hasVehicle: Boolean!
+  observations: String
   createdAt: DateTime!
   updatedAt: DateTime!
   createdBy: String
@@ -527,21 +536,39 @@ input WarrantyUploadInput {
 input CreateApartmentInput {
   unit: String!
   block: String!
-  ownerName: String!
-  phone: String
-  email: String
   floor: Int
+  ownerName: String!
+  ownerDocument: String
+  ownerPhone: String
+  ownerEmail: String
+  isRented: Boolean = false
+  tenantName: String
+  tenantDocument: String
+  tenantPhone: String
+  tenantEmail: String
+  rentalStart: DateTime
+  rentalEnd: DateTime
   hasVehicle: Boolean!
+  observations: String
 }
 
 input UpdateApartmentInput {
   unit: String
   block: String
-  ownerName: String
-  phone: String
-  email: String
   floor: Int
+  ownerName: String
+  ownerDocument: String
+  ownerPhone: String
+  ownerEmail: String
+  isRented: Boolean
+  tenantName: String
+  tenantDocument: String
+  tenantPhone: String
+  tenantEmail: String
+  rentalStart: DateTime
+  rentalEnd: DateTime
   hasVehicle: Boolean
+  observations: String
 }
 
 input CreateParkingSpotInput {
@@ -614,6 +641,7 @@ type Query {
   warranties(filters: WarrantyFilters, pagination: PaginationInput): WarrantyPage!
   warranty(id: ID!): Warranty
   parkingApartments: [Apartment!]!
+  apartments: [Apartment!]!
   parkingSpots: [ParkingSpot!]!
   parkingResults: [LotteryResult!]!
   lotterySessions: [LotterySession!]!
@@ -649,6 +677,9 @@ type Mutation {
   createParkingApartment(input: CreateApartmentInput!): Apartment!
   updateParkingApartment(id: ID!, input: UpdateApartmentInput!): Apartment!
   deleteParkingApartment(id: ID!): Boolean!
+  createApartment(input: CreateApartmentInput!): Apartment!
+  updateApartment(id: ID!, input: UpdateApartmentInput!): Apartment!
+  deleteApartment(id: ID!): Boolean!
   createParkingSpot(input: CreateParkingSpotInput!): ParkingSpot!
   updateParkingSpot(id: ID!, input: UpdateParkingSpotInput!): ParkingSpot!
   deleteParkingSpot(id: ID!): Boolean!

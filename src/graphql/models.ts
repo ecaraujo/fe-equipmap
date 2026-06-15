@@ -206,11 +206,20 @@ export interface Apartment extends AuditFields {
   id: string;
   unit: string;
   block: string;
-  ownerName: string;
-  phone?: string | null;
-  email?: string | null;
   floor?: number | null;
+  ownerName: string;
+  ownerDocument?: string | null;
+  ownerPhone?: string | null;
+  ownerEmail?: string | null;
+  isRented: boolean;
+  tenantName?: string | null;
+  tenantDocument?: string | null;
+  tenantPhone?: string | null;
+  tenantEmail?: string | null;
+  rentalStart?: string | null;
+  rentalEnd?: string | null;
   hasVehicle: boolean;
+  observations?: string | null;
 }
 export interface ParkingSpot extends AuditFields {
   id: string;
@@ -246,7 +255,7 @@ export type UpdateSpotDto = Partial<CreateSpotDto>;
 
 export type BrigadierRole = "Brigadista" | "Brigadista Chefe" | "Sub-Chefe";
 export type NotificationChannel = "whatsapp" | "sms";
-export type NotificationStatus = "sent" | "failed";
+export type NotificationStatus = "queued" | "sent" | "failed";
 export type CertificationStatus = "valid" | "expiring" | "expired";
 
 export interface Brigadier extends AuditFields {

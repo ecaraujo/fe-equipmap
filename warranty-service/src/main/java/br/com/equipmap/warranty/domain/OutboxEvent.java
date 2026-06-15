@@ -77,4 +77,5 @@ public class OutboxEvent {
     public String getDedupKey() { return dedupKey; }
     public OutboxStatus getStatus() { return status; }
     public int getAttempts() { return attempts; }
+    public Instant getPublishedAt() { return publishedAt; }
 }

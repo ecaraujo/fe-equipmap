@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Building,
   Building2,
   LayoutDashboard,
   Package,
@@ -40,6 +41,7 @@ type Page =
   | "inventory"
   | "maintenance"
   | "warranties"
+  | "apartments"
   | "parking"
   | "brigadiers";
 
@@ -57,6 +59,7 @@ const navItems = [
       { id: "inventory" as Page, label: "Inventário", icon: Package },
       { id: "maintenance" as Page, label: "Manutenções", icon: Wrench },
       { id: "warranties" as Page, label: "Garantias", icon: Shield },
+      { id: "apartments" as Page, label: "Apartamentos", icon: Building },
     ],
   },
   {

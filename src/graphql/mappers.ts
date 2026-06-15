@@ -26,6 +26,7 @@ import {
   type Warranty,
   type DashboardSummaryQuery,
 } from "./generated";
+import { formatPhone } from "../utils/format";
 
 function formatDate(value?: string | null): string {
   if (!value) return "";
@@ -117,6 +118,7 @@ const channelMap: Record<NotificationChannel, import("./models").NotificationCha
 };
 
 const deliveryStatusMap: Record<NotificationDeliveryStatus, import("./models").NotificationStatus> = {
+  QUEUED: "queued",
   SENT: "sent",
   FAILED: "failed",
 };
@@ -200,8 +202,14 @@ export function mapWarranty(item: Pick<Warranty, "id" | "equipment" | "equipment
   };
 }
 
-export function mapApartment(item: Pick<Apartment, "id" | "unit" | "block" | "ownerName" | "phone" | "email" | "floor" | "hasVehicle" | "createdAt" | "updatedAt" | "createdBy">): import("./models").Apartment {
-  return { ...item };
+export function mapApartment(item: Pick<Apartment, "id" | "unit" | "block" | "floor" | "ownerName" | "ownerDocument" | "ownerPhone" | "ownerEmail" | "isRented" | "tenantName" | "tenantDocument" | "tenantPhone" | "tenantEmail" | "rentalStart" | "rentalEnd" | "hasVehicle" | "observations" | "createdAt" | "updatedAt" | "createdBy">): import("./models").Apartment {
+  return {
+    ...item,
+    ownerPhone: item.ownerPhone ? formatPhone(item.ownerPhone) : item.ownerPhone,
+    tenantPhone: item.tenantPhone ? formatPhone(item.tenantPhone) : item.tenantPhone,
+    rentalStart: item.rentalStart ? formatDate(item.rentalStart) : item.rentalStart,
+    rentalEnd: item.rentalEnd ? formatDate(item.rentalEnd) : item.rentalEnd,
+  };
 }
 
 export function mapSpot(item: Pick<ParkingSpot, "id" | "number" | "type" | "covered" | "floor" | "assignedTo" | "createdAt" | "updatedAt" | "createdBy">): import("./models").ParkingSpot {
@@ -214,10 +222,20 @@ export function mapLotteryResult(item: Pick<LotteryResult, "id" | "apartmentId" 
 
 export function mapBrigadier(item: Pick<Brigadier, "id" | "name" | "apartment" | "block" | "phone" | "role" | "certificationDate" | "certificationExpiry" | "certificationBody" | "active" | "observations" | "createdAt" | "updatedAt" | "createdBy">): import("./models").Brigadier {
   return {
-    ...item,
+    id: item.id,
+    name: item.name,
+    apartment: item.apartment,
+    block: item.block,
+    phone: formatPhone(item.phone),
     role: brigadierRoleMap[item.role],
     certificationDate: formatDate(item.certificationDate),
     certificationExpiry: formatDate(item.certificationExpiry),
+    certificationBody: item.certificationBody,
+    active: item.active,
+    observations: item.observations,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    createdBy: item.createdBy,
   };
 }
 

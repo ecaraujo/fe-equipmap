@@ -28,14 +28,14 @@ function assert(condition, message) {
   }
 }
 
-async function graphql(query, variables = {}, token) {
+async function graphql(query, variables, token) {
   const response = await fetch(BFF_URL, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ query, variables }),
+    body: JSON.stringify({ query, variables: variables ?? {} }),
   });
   return response.json();
 }

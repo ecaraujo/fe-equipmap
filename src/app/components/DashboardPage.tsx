@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   AlertTriangle,
   Calendar,
@@ -18,8 +19,10 @@ import {
 } from "recharts";
 import { useDashboardSummaryQuery } from "../../graphql/generated";
 import { mapDashboardSummary } from "../../graphql/mappers";
-import type { DashboardMaintenance, DashboardSummary } from "../../graphql/models";
+import type { CreateEquipmentDto, DashboardMaintenance, DashboardSummary } from "../../graphql/models";
+import { useEquipment } from "../../hooks/useEquipment";
 import { Button } from "./ui/button";
+import { EquipmentFormDialog } from "./EquipmentFormDialog";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   Ativo: { label: "Ativo", className: "bg-green-100 text-green-700 border-green-200" },
@@ -120,6 +123,41 @@ function DashboardError({ message, onRetry }: { message: string; onRetry: () => 
 
 export function DashboardPage() {
   const { data, loading, error, refetch } = useDashboardSummaryQuery();
+  const { create } = useEquipment();
+  const [showEquipmentModal, setShowEquipmentModal] = useState(false);
+  const [equipmentForm, setEquipmentForm] = useState<Partial<CreateEquipmentDto>>({ status: "Ativo" });
+  const [isSavingEquipment, setIsSavingEquipment] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const closeEquipmentModal = () => {
+    setShowEquipmentModal(false);
+    setEquipmentForm({ status: "Ativo" });
+  };
+
+  const openCreateEquipment = () => {
+    setActionError(null);
+    setEquipmentForm({ status: "Ativo" });
+    setShowEquipmentModal(true);
+  };
+
+  const handleSaveEquipment = async () => {
+    if (!equipmentForm.name || !equipmentForm.brand || !equipmentForm.type || !equipmentForm.location) {
+      setActionError("Preencha nome, marca, tipo e localizacao do equipamento.");
+      return;
+    }
+
+    setIsSavingEquipment(true);
+    setActionError(null);
+    try {
+      await create(equipmentForm as CreateEquipmentDto);
+      await refetch();
+      closeEquipmentModal();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Nao foi possivel cadastrar o equipamento.");
+    } finally {
+      setIsSavingEquipment(false);
+    }
+  };
 
   if (loading && !data) {
     return <DashboardLoading />;
@@ -145,11 +183,17 @@ export function DashboardPage() {
             {[summary.condominiumName, generatedAtLabel(summary.generatedAt)].filter(Boolean).join(" - ")}
           </p>
         </div>
-        <Button className="bg-blue-700 hover:bg-blue-800 text-white gap-2 hidden sm:flex">
+        <Button className="bg-blue-700 hover:bg-blue-800 text-white gap-2 hidden sm:flex" onClick={openCreateEquipment}>
           <Package className="w-4 h-4" />
           Novo equipamento
         </Button>
       </div>
+
+      {actionError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {actionError}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -250,6 +294,15 @@ export function DashboardPage() {
         </div>
         <RecentEquipmentTable summary={summary} />
       </div>
+
+      <EquipmentFormDialog
+        open={showEquipmentModal}
+        form={equipmentForm}
+        setForm={setEquipmentForm}
+        isSaving={isSavingEquipment}
+        onClose={closeEquipmentModal}
+        onSave={handleSaveEquipment}
+      />
     </div>
   );
 }

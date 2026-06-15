@@ -20,10 +20,8 @@ function paginationQuery(pagination?: StoreRecord): StoreRecord {
 }
 
 function filteredQuery(filters?: StoreRecord, pagination?: StoreRecord): StoreRecord {
-  return {
-    ...paginationQuery(pagination),
-    ...(filters ?? {}),
-  };
+  const query = paginationQuery(pagination);
+  return filters ? { ...query, ...filters } : query;
 }
 
 function warrantyMonthsBetween(start?: unknown, end?: unknown): number | undefined {
@@ -43,6 +41,29 @@ function createWarrantyBody(input: StoreRecord): StoreRecord {
     purchaseDate: input.purchaseDate ?? input.warrantyStart,
     warrantyMonths: input.warrantyMonths ?? warrantyMonthsBetween(input.warrantyStart, input.warrantyEnd),
   };
+}
+
+function parkingApartmentBody(input: StoreRecord): StoreRecord {
+  return Object.fromEntries(
+    Object.entries({
+      unit: input.unit,
+      block: input.block,
+      floor: input.floor,
+      ownerName: input.ownerName,
+      ownerDocument: input.ownerDocument,
+      ownerPhone: input.ownerPhone,
+      ownerEmail: input.ownerEmail,
+      isRented: input.isRented,
+      tenantName: input.tenantName,
+      tenantDocument: input.tenantDocument,
+      tenantPhone: input.tenantPhone,
+      tenantEmail: input.tenantEmail,
+      rentalStart: toLocalDate(input.rentalStart),
+      rentalEnd: toLocalDate(input.rentalEnd),
+      hasVehicle: input.hasVehicle,
+      observations: input.observations,
+    }).filter(([, value]) => value !== undefined),
+  );
 }
 
 function requireAuth(ctx: GraphQLContext) {
@@ -99,6 +120,8 @@ function fromBrigadierServiceRole(role: unknown): unknown {
 function brigadierBody(input: StoreRecord): StoreRecord {
   return {
     name: input.name,
+    apartment: input.apartment,
+    block: input.block,
     role: toBrigadierServiceRole(input.role),
     phone: input.phone,
     active: input.active,
@@ -171,6 +194,26 @@ const labels = {
 
 function labelFor(map: Record<string, string>, key: unknown): string {
   return typeof key === "string" ? (map[key] ?? key) : "";
+}
+
+function scalarToString(value: unknown): string {
+  if (value instanceof Date) return value.toISOString();
+  switch (typeof value) {
+    case "string":
+      return value;
+    case "number":
+    case "boolean":
+    case "bigint":
+      return value.toString();
+    default:
+      throw new TypeError("DateTime value must be a string, number, boolean, bigint, or Date");
+  }
+}
+
+function idToString(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "bigint") return value.toString();
+  return null;
 }
 
 function totalFromPage(page: { pageInfo: JsonRecord }): number {
@@ -297,11 +340,9 @@ export const resolvers = {
   DateTime: new GraphQLScalarType({
     name: "DateTime",
     serialize(value) {
-      return value instanceof Date ? value.toISOString() : String(value);
+      return scalarToString(value);
     },
-    parseValue(value) {
-      return String(value);
-    },
+    parseValue: scalarToString,
     parseLiteral(ast) {
       return ast.kind === Kind.STRING ? ast.value : null;
     },
@@ -338,8 +379,9 @@ export const resolvers = {
   CondominiumUser: {
     condominium(parent: StoreRecord, _: unknown, ctx: GraphQLContext) {
       if (parent.condominium) return parent.condominium;
-      if (!parent.condominiumId) return null;
-      return ctx.loaders?.condominiumById.load(String(parent.condominiumId));
+      const condominiumId = idToString(parent.condominiumId);
+      if (!condominiumId) return null;
+      return ctx.loaders?.condominiumById.load(condominiumId);
     },
   },
 
@@ -383,6 +425,9 @@ export const resolvers = {
   Apartment: {
     ownerName(parent: StoreRecord) {
       return parent.ownerName ?? parent.owner;
+    },
+    isRented(parent: StoreRecord) {
+      return parent.isRented ?? parent.rented ?? false;
     },
   },
 
@@ -431,6 +476,9 @@ export const resolvers = {
     },
     sentAt(parent: StoreRecord) {
       return parent.sentAt ?? parent.createdAt;
+    },
+    updatedAt(parent: StoreRecord) {
+      return parent.updatedAt ?? parent.sentAt ?? parent.createdAt;
     },
   },
 
@@ -487,6 +535,9 @@ export const resolvers = {
       return real(ctx).warranty.get(`/warranties/${args.id}`, requireRealAuth(ctx));
     },
     parkingApartments(_: unknown, __: unknown, ctx: GraphQLContext) {
+      return real(ctx).parking.get("/parking/apartments", requireRealAuth(ctx));
+    },
+    apartments(_: unknown, __: unknown, ctx: GraphQLContext) {
       return real(ctx).parking.get("/parking/apartments", requireRealAuth(ctx));
     },
     parkingSpots(_: unknown, __: unknown, ctx: GraphQLContext) {
@@ -599,16 +650,25 @@ export const resolvers = {
       });
     },
     createParkingApartment(_: unknown, args: { input: StoreRecord }, ctx: GraphQLContext) {
-      const { ownerName, phone: _phone, email: _email, floor: _floor, ...rest } = args.input as Record<string, unknown>;
-      const body = { ...rest, owner: ownerName };
+      const body = parkingApartmentBody(args.input);
       return real(ctx).parking.post("/parking/apartments", { ...requireRealAuth(ctx), body });
     },
     updateParkingApartment(_: unknown, args: { id: string; input: StoreRecord }, ctx: GraphQLContext) {
-      const { ownerName, phone: _phone, email: _email, floor: _floor, ...rest } = args.input as Record<string, unknown>;
-      const body = ownerName !== undefined ? { ...rest, owner: ownerName } : rest;
+      const body = parkingApartmentBody(args.input);
       return real(ctx).parking.put(`/parking/apartments/${args.id}`, { ...requireRealAuth(ctx), body });
     },
     deleteParkingApartment(_: unknown, args: { id: string }, ctx: GraphQLContext) {
+      return real(ctx).parking.delete(`/parking/apartments/${args.id}`, requireRealAuth(ctx));
+    },
+    createApartment(_: unknown, args: { input: StoreRecord }, ctx: GraphQLContext) {
+      const body = parkingApartmentBody(args.input);
+      return real(ctx).parking.post("/parking/apartments", { ...requireRealAuth(ctx), body });
+    },
+    updateApartment(_: unknown, args: { id: string; input: StoreRecord }, ctx: GraphQLContext) {
+      const body = parkingApartmentBody(args.input);
+      return real(ctx).parking.put(`/parking/apartments/${args.id}`, { ...requireRealAuth(ctx), body });
+    },
+    deleteApartment(_: unknown, args: { id: string }, ctx: GraphQLContext) {
       return real(ctx).parking.delete(`/parking/apartments/${args.id}`, requireRealAuth(ctx));
     },
     createParkingSpot(_: unknown, args: { input: StoreRecord }, ctx: GraphQLContext) {

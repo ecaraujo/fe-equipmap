@@ -6,6 +6,7 @@ import br.com.equipmap.core.error.NotFoundException;
 import br.com.equipmap.core.error.ValidationException;
 import br.com.equipmap.parking.api.dto.*;
 import br.com.equipmap.parking.domain.Apartment;
+import br.com.equipmap.parking.domain.ApartmentDetails;
 import br.com.equipmap.parking.domain.LotteryResult;
 import br.com.equipmap.parking.domain.LotterySession;
 import br.com.equipmap.parking.domain.ParkingSpot;
@@ -19,10 +20,14 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
+import java.util.regex.Pattern;
 
 @Service
 public class ParkingService {
+    private static final Pattern NON_DIGITS = Pattern.compile("\\D");
+
     private final ApartmentRepository apartmentRepository;
     private final ParkingSpotRepository spotRepository;
     private final LotterySessionRepository sessionRepository;
@@ -45,14 +50,15 @@ public class ParkingService {
     @Transactional
     public ApartmentResponse createApartment(RequestPrincipal principal, CreateApartmentRequest request) {
         requireWrite(principal);
-        return ApartmentResponse.from(apartmentRepository.save(new Apartment(principal.condominiumId(), request.unit(), request.block(), request.owner(), request.hasVehicle())));
+        ApartmentDetails details = validateCreateApartment(principal, request);
+        return ApartmentResponse.from(apartmentRepository.save(new Apartment(principal.condominiumId(), details)));
     }
 
     @Transactional
     public ApartmentResponse updateApartment(RequestPrincipal principal, UUID id, UpdateApartmentRequest request) {
         requireWrite(principal);
         Apartment apartment = findApartment(principal, id);
-        apartment.update(request.unit(), request.block(), request.owner(), request.hasVehicle());
+        apartment.update(validateUpdateApartment(principal, apartment, request));
         return ApartmentResponse.from(apartment);
     }
 
@@ -151,6 +157,157 @@ public class ParkingService {
 
     private void requireWrite(RequestPrincipal principal) {
         if (!principal.canWrite()) throw new ForbiddenException("User does not have permission to modify parking data");
+    }
+
+    private ApartmentDetails validateCreateApartment(RequestPrincipal principal, CreateApartmentRequest request) {
+        List<ErrorDetail> details = new ArrayList<>();
+        String unit = required("unit", request.unit(), details);
+        String block = required("block", request.block(), details);
+        String ownerName = required("ownerName", firstNonBlank(request.ownerName(), request.owner()), details);
+        String ownerPhone = normalizePhone("ownerPhone", request.ownerPhone(), details);
+        String tenantPhone = normalizePhone("tenantPhone", request.tenantPhone(), details);
+        ApartmentDetails apartmentDetails = validateApartmentDetails(new ApartmentDetails(
+                unit,
+                block,
+                request.floor(),
+                ownerName,
+                clean(request.ownerDocument()),
+                ownerPhone,
+                clean(request.ownerEmail()),
+                request.isRented(),
+                clean(request.tenantName()),
+                clean(request.tenantDocument()),
+                tenantPhone,
+                clean(request.tenantEmail()),
+                request.rentalStart(),
+                request.rentalEnd(),
+                request.hasVehicle(),
+                clean(request.observations())), details);
+        validateActiveApartmentUniqueness(principal.condominiumId(), unit, block, null, details);
+        throwIfInvalid(details);
+        return apartmentDetails;
+    }
+
+    private ApartmentDetails validateUpdateApartment(RequestPrincipal principal, Apartment apartment, UpdateApartmentRequest request) {
+        List<ErrorDetail> details = new ArrayList<>();
+        String unit = required("unit", valueOrCurrent(request.unit(), apartment.getUnit()), details);
+        String block = required("block", valueOrCurrent(request.block(), apartment.getBlock()), details);
+        String ownerName = required("ownerName", firstNonBlank(request.ownerName(), request.owner(), apartment.getOwnerName()), details);
+        String ownerPhone = normalizePhone("ownerPhone", valueOrCurrent(request.ownerPhone(), apartment.getOwnerPhone()), details);
+        String tenantPhone = normalizePhone("tenantPhone", valueOrCurrent(request.tenantPhone(), apartment.getTenantPhone()), details);
+        boolean rented = request.isRented() == null ? apartment.isRented() : request.isRented();
+        ApartmentDetails apartmentDetails = validateApartmentDetails(new ApartmentDetails(
+                unit,
+                block,
+                request.floor() == null ? apartment.getFloor() : request.floor(),
+                ownerName,
+                valueOrCurrent(request.ownerDocument(), apartment.getOwnerDocument()),
+                ownerPhone,
+                valueOrCurrent(request.ownerEmail(), apartment.getOwnerEmail()),
+                rented,
+                valueOrCurrent(request.tenantName(), apartment.getTenantName()),
+                valueOrCurrent(request.tenantDocument(), apartment.getTenantDocument()),
+                tenantPhone,
+                valueOrCurrent(request.tenantEmail(), apartment.getTenantEmail()),
+                request.rentalStart() == null ? apartment.getRentalStart() : request.rentalStart(),
+                request.rentalEnd() == null ? apartment.getRentalEnd() : request.rentalEnd(),
+                request.hasVehicle() == null ? apartment.isHasVehicle() : request.hasVehicle(),
+                valueOrCurrent(request.observations(), apartment.getObservations())), details);
+        validateActiveApartmentUniqueness(principal.condominiumId(), unit, block, apartment.getId(), details);
+        throwIfInvalid(details);
+        return apartmentDetails;
+    }
+
+    private ApartmentDetails validateApartmentDetails(ApartmentDetails apartment, List<ErrorDetail> details) {
+        String tenantName = apartment.tenantName();
+        String tenantDocument = apartment.tenantDocument();
+        String tenantPhone = apartment.tenantPhone();
+        String tenantEmail = apartment.tenantEmail();
+        LocalDate rentalStart = apartment.rentalStart();
+        LocalDate rentalEnd = apartment.rentalEnd();
+        if (apartment.ownerPhone() == null && isBlank(apartment.ownerEmail())) {
+            details.add(new ErrorDetail("ownerContact", "ownerPhone or ownerEmail is required"));
+        }
+        if (apartment.rented()) {
+            if (isBlank(tenantName)) {
+                details.add(new ErrorDetail("tenantName", "tenantName is required when apartment is rented"));
+            }
+            if (tenantPhone == null && isBlank(tenantEmail)) {
+                details.add(new ErrorDetail("tenantContact", "tenantPhone or tenantEmail is required when apartment is rented"));
+            }
+        } else {
+            tenantName = null;
+            tenantDocument = null;
+            tenantPhone = null;
+            tenantEmail = null;
+            rentalStart = null;
+            rentalEnd = null;
+        }
+        if (rentalStart != null && rentalEnd != null && rentalEnd.isBefore(rentalStart)) {
+            details.add(new ErrorDetail("rentalEnd", "rentalEnd must be greater than or equal to rentalStart"));
+        }
+        return new ApartmentDetails(apartment.unit(), apartment.block(), apartment.floor(), apartment.ownerName(),
+                apartment.ownerDocument(), apartment.ownerPhone(), apartment.ownerEmail(), apartment.rented(),
+                tenantName, tenantDocument, tenantPhone, tenantEmail, rentalStart, rentalEnd,
+                apartment.hasVehicle(), apartment.observations());
+    }
+
+    private void validateActiveApartmentUniqueness(UUID condominiumId, String unit, String block, UUID excludedId, List<ErrorDetail> details) {
+        if (unit != null && block != null && apartmentRepository.existsActiveUnitBlock(condominiumId, unit, block, excludedId)) {
+            details.add(new ErrorDetail("unit", "active apartment already exists for this condominium, unit, and block"));
+        }
+    }
+
+    private void throwIfInvalid(List<ErrorDetail> details) {
+        if (!details.isEmpty()) {
+            throw new ValidationException("Apartment validation failed", details);
+        }
+    }
+
+    private String required(String field, String value, List<ErrorDetail> details) {
+        String cleaned = clean(value);
+        if (cleaned == null) {
+            details.add(new ErrorDetail(field, field + " is required"));
+        }
+        return cleaned;
+    }
+
+    private String normalizePhone(String field, String value, List<ErrorDetail> details) {
+        String cleaned = clean(value);
+        if (cleaned == null) {
+            return null;
+        }
+        String digits = NON_DIGITS.matcher(cleaned).replaceAll("");
+        if (digits.length() != 10 && digits.length() != 11) {
+            details.add(new ErrorDetail(field, field + " must contain 10 or 11 digits"));
+        }
+        return digits;
+    }
+
+    private String valueOrCurrent(String value, String current) {
+        return value == null ? current : clean(value);
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            String cleaned = clean(value);
+            if (cleaned != null) {
+                return cleaned;
+            }
+        }
+        return null;
+    }
+
+    private String clean(String value) {
+        if (value == null) {
+            return null;
+        }
+        String cleaned = value.trim();
+        return cleaned.isEmpty() ? null : cleaned;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private <T> void fisherYates(List<T> values, Random random) {

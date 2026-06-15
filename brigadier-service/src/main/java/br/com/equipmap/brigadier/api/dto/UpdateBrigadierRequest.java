@@ -6,6 +6,8 @@ import java.time.LocalDate;
 
 public record UpdateBrigadierRequest(
         String name,
+        String apartment,
+        String block,
         BrigadierRole role,
         String phone,
         String email,

@@ -7,12 +7,13 @@ import { MaintenancePage } from "./components/MaintenancePage";
 import { WarrantyPage } from "./components/WarrantyPage";
 import { ParkingLotteryPage } from "./components/ParkingLotteryPage";
 import { BrigadiersPage } from "./components/BrigadiersPage";
+import { ApartmentsPage } from "./components/ApartmentsPage";
 import { CondominiumSelectionPage } from "./components/CondominiumSelectionPage";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { NotificationProvider } from "../contexts/NotificationContext";
 import { ApolloClientProvider } from "../graphql/client";
 
-type Page = "dashboard" | "inventory" | "maintenance" | "warranties" | "parking" | "brigadiers";
+type Page = "dashboard" | "inventory" | "maintenance" | "warranties" | "apartments" | "parking" | "brigadiers";
 
 function AppContent() {
   const { isAuthenticated, pendingCondominiums } = useAuth();
@@ -32,6 +33,7 @@ function AppContent() {
       case "inventory":    return <InventoryPage />;
       case "maintenance":  return <MaintenancePage />;
       case "warranties":   return <WarrantyPage />;
+      case "apartments":   return <ApartmentsPage />;
       case "parking":      return <ParkingLotteryPage />;
       case "brigadiers":   return <BrigadiersPage />;
       default:             return <DashboardPage />;

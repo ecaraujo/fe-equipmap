@@ -13,12 +13,18 @@
  *   --skip-destructive: skips RabbitMQ resilience test (stops/starts containers)
  */
 
-import { execSync } from "child_process";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { execSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const skipDestructive = process.argv.includes("--skip-destructive");
+
+function statusIcon(status) {
+  if (status === "passed") return "✓";
+  if (status === "skipped") return "⊘";
+  return "✗";
+}
 
 const steps = [
   { task: "4.3", name: "Runtime Mock Guard", script: "verify-runtime-mocks.mjs" },
@@ -44,7 +50,8 @@ console.log("━━━ Pre-flight: Health Check ━━━\n");
 try {
   execSync(`node ${join(__dirname, "check-health.mjs")}`, { stdio: "inherit" });
   console.log("\n✓ All services healthy\n");
-} catch {
+} catch (error) {
+  console.error(`  Reason: ${error.message}`);
   console.error("\n✗ Health check failed. Ensure all services are running.");
   console.error("  Run: docker compose up --build -d && sleep 30 && node scripts/check-health.mjs");
   process.exit(1);
@@ -80,7 +87,7 @@ console.log("║                  Homologation Summary                    ║");
 console.log("╠══════════════════════════════════════════════════════════╣");
 
 for (const r of results) {
-  const icon = r.status === "passed" ? "✓" : r.status === "skipped" ? "⊘" : "✗";
+  const icon = statusIcon(r.status);
   console.log(`║ ${icon} [${r.task.padEnd(16)}] ${r.name.padEnd(36)} ║`);
 }
 

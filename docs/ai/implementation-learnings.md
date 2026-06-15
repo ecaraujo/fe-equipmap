@@ -19,6 +19,7 @@ Use this file as persistent project memory for AI coding agents. Read it before 
 - `brigadier-service` may simulate external WhatsApp/SMS delivery only through `SandboxMessagingProvider`, enabled explicitly with `EQUIPMAP_MESSAGING_PROVIDER=sandbox`. Do not call it "mock" in runtime code.
 - The dashboard is currently an exception: `src/app/components/DashboardPage.tsx` still contains static arrays/cards (`maintenanceData`, `recentEquipment`, `upcomingMaintenance`, counts like `248`). Do not assume Dashboard data comes from the database until it is migrated to real queries.
 - Domain pages such as inventory, maintenance, warranty, parking, brigadiers, and notifications should go through hooks backed by generated Apollo operations in `src/graphql/generated.tsx`.
+- Apartment/unit registration is a shared capability in the MVP. Keep it accessible inside `Sorteio de Vagas` and also expose it as a standalone `Apartamentos` module below `Garantias`; both entry points must reuse the same BFF contract, Apollo mutations, validation helpers, and form components so the capability can be modularized/commercialized separately later.
 
 ## Testing Lessons Learned
 
@@ -50,6 +51,7 @@ Use this file as persistent project memory for AI coding agents. Read it before 
 - `run-homologation.mjs` includes RabbitMQ resilience and needs permission to stop/start Docker containers. If it fails only with "Could not stop RabbitMQ" or Docker pipe access errors, rerun it with elevated Docker permissions before treating the suite as failed.
 - `validate-jobs-idempotency.mjs` must wait for async notification processing before comparing duplicate counts. Do not use a fixed short sleep as proof of no notification.
 - Browser errors from extensions such as `A listener indicated an asynchronous response...` are usually not app failures. Prioritize GraphQL/network/runtime errors first.
+- Every implemented OpenSpec task must include a SonarCloud/SonarQube review of touched files before marking the task complete. Fix new bugs, vulnerabilities, security hotspots, code smells, duplication, and maintainability debt introduced by the task; document any false positive with a concrete reason.
 
 ## Framework and Configuration Lessons Learned
 
@@ -138,6 +140,7 @@ Use this file as persistent project memory for AI coding agents. Read it before 
 - For integrated behavior, run `cd equipmap-infra; node scripts/check-health.mjs`.
 - If auth/login is touched, test with a stale token and then with a cleared token.
 - If Docker behavior is touched, check `docker compose --env-file .env -f docker-compose.yml config`.
+- Before marking an OpenSpec task complete, inspect SonarCloud/SonarQube findings for the files changed in that task and leave no new unresolved issues.
 
 ## Log of New Lessons Learned
 
@@ -172,3 +175,18 @@ Use this file as persistent project memory for AI coding agents. Read it before 
 - 2026-05-26: `warranty-service` requires `purchaseDate`, `warrantyStart`, `warrantyEnd`, and `warrantyMonths >= 1` on create. Warranty forms must collect or derive these fields and `src/graphql/inputs.ts` must send ISO `yyyy-MM-dd`; do not use `toLocaleDateString("pt-BR")` in date input handlers.
 - 2026-05-26: Warranty "expiring" means within 30 days. Keep `WARRANTY_EXPIRING_WINDOW_DAYS`, `equipmap.warranty.expiring-window-days`, BFF `dashboardSummary.warrantyExpiringTotal`, and the sidebar `Garantias` badge aligned to the 30-day window.
 - 2026-05-26: BFF resolvers should normalize create payloads when the public GraphQL schema is looser than the Java service contract. For `createWarranty`, fill `purchaseDate` from `warrantyStart` and calculate `warrantyMonths` before calling `warranty-service` so clients do not trigger opaque backend validation errors.
+- 2026-05-27: Brigadier create/update forms must send every required BFF field, especially `block`. Initialize `src/app/components/BrigadiersPage.tsx` with `block: "A"`, mark it required, and validate before calling `createBrigadier`; otherwise GraphQL rejects the request with `Field "block" of required type "String!" was not provided`.
+- 2026-05-27: Keep `<input type="date">` state as ISO `yyyy-MM-dd`. Do not store `toLocaleDateString("pt-BR")` in form state; reconverting localized strings can produce invalid values such as `2-05-27`. `src/graphql/inputs.ts` must accept both ISO dates and one/two-digit `pt-BR` dates defensively.
+- 2026-05-27: Every Radix `DialogContent` in runtime pages must include `DialogDescription` or explicitly set `aria-describedby={undefined}`. Prefer a real `DialogDescription` so the console does not warn while users test forms.
+- 2026-06-04: Shared apartment CRUD is consumed via two independent hooks: `useApartments` (standalone page) refetches both `ApartmentsDocument` and `ParkingDataDocument`; `useParking` (lottery context) refetches `ParkingDataDocument` via its own `refetch()`. Both paths keep Apollo cache consistent across views without manual cache writes.
+- 2026-06-04: Adding a new page requires updating the `Page` string literal union in both `src/app/App.tsx` and `src/app/components/Layout.tsx`, plus adding the switch case and nav item. The two files share the same type definition independently (no single shared type export).
+- 2026-05-27: `brigadier-service` notification log responses do not currently include `updatedAt`. Keep the BFF `NotificationLog.updatedAt` resolver defensive with `updatedAt ?? sentAt ?? createdAt`; otherwise GraphQL fails with `Cannot return null for non-nullable field NotificationLog.updatedAt`.
+- 2026-05-27: Phone fields in forms must use the visible mask `(xx)xxxxx-xxxx`, but GraphQL input mappers should strip to digits before calling services. Use `src/utils/format.ts` helpers (`formatPhone`, `onlyDigits`) instead of ad hoc phone formatting.
+- 2026-05-27: Brigadier `apartment` and `block` must be persisted by the real `brigadier-service`, not synthesized in BFF resolvers. Keep `CreateBrigadierRequest`, `UpdateBrigadierRequest`, `BrigadierResponse`, `Brigadier`, Flyway migrations, and `bff-equipmap/src/resolvers.ts::brigadierBody` aligned when adding GraphQL fields.
+- 2026-05-27: Never spread Apollo query objects or UI models into mutation variables. Generated objects include fields such as `__typename`, `id`, labels, status, audit timestamps, and `createdBy` that are rejected by input types like `UpdateBrigadierInput`. Keep edit forms as allowlisted DTO fields and make `src/graphql/inputs.ts` return explicit mutation input objects only.
+- 2026-05-27: Cross-page action buttons must call the same real mutation flow as the domain page. For example, Dashboard "Novo equipamento" must open an equipment form backed by `useEquipment().create`, not an inert button or local-only modal, and must refetch `DashboardSummary` after saving.
+- 2026-05-27: ESLint/Sonar treat destructured discard variables as unused even when prefixed with `_`. In BFF resolvers, prefer explicit allowlist/filter helpers such as `parkingApartmentBody` over `const { phone: _phone, ...rest } = input` when adapting GraphQL inputs to narrower service payloads.
+- 2026-05-27: SonarJS/SonarTS findings in `equipmap-infra/scripts/*.mjs` should be fixed without changing validation semantics: use `node:` imports for built-ins, avoid default parameters before required ones, handle caught exceptions explicitly, extract nested template literals, and replace nested ternaries with small helper functions.
+- 2026-05-27: SonarJava does not always infer JPA derived query usage or persisted audit fields. Remove truly unused imports, and expose intentional persisted fields such as soft-delete timestamps or outbox publication timestamps through getters instead of deleting domain state used by Spring Data/JPA.
+- 2026-05-27: Apartment/unit registration must be treated as a reusable domain capability, not a UI feature owned only by `ParkingLotteryPage`. Keep the registration flow available inside `Sorteio de Vagas`, add a standalone `Apartamentos` menu entry below `Garantias`, and share form/payload/mutation logic between both entry points to support future post-MVP modularization and separate commercialization.
+- 2026-05-27: SonarCloud/SonarQube is a required quality gate for every implemented OpenSpec task. Do not mark a task complete while new findings remain in touched files; fix code smells and maintainability issues alongside functional bugs instead of deferring them to chat history.

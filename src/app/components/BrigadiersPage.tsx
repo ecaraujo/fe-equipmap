@@ -20,6 +20,7 @@ import { Checkbox } from "./ui/checkbox";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -36,6 +37,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Textarea } from "./ui/textarea";
 import { useBrigadiers } from "../../hooks/useBrigadiers";
+import { formatPhone, toDateInputValue } from "../../utils/format";
 import type {
   Brigadier,
   CreateBrigadierDto,
@@ -81,9 +83,49 @@ const messageTemplates = [
   },
 ];
 
+const defaultBrigadierForm: Partial<CreateBrigadierDto> = {
+  role: "Brigadista",
+  block: "A",
+  active: true,
+};
+
+function brigadierToForm(brigadier: Brigadier): Partial<CreateBrigadierDto> {
+  return {
+    name: brigadier.name,
+    apartment: brigadier.apartment,
+    block: brigadier.block || "A",
+    phone: formatPhone(brigadier.phone),
+    role: brigadier.role,
+    certificationDate: toDateInput(brigadier.certificationDate),
+    certificationExpiry: toDateInput(brigadier.certificationExpiry),
+    certificationBody: brigadier.certificationBody,
+    active: brigadier.active,
+    observations: brigadier.observations,
+  };
+}
+
+function parseDate(value?: string): Date | null {
+  if (!value) return null;
+
+  const iso = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) {
+    const [, year, month, day] = iso;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const pt = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (pt) {
+    const [, day, month, year] = pt;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function certificationStatus(expiry: string): "valid" | "expiring" | "expired" {
-  const [d, m, y] = expiry.split("/").map(Number);
-  const date = new Date(y, m - 1, d);
+  const date = parseDate(expiry);
+  if (!date) return "expired";
   const diff = Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   if (diff < 0) return "expired";
   if (diff <= 90) return "expiring";
@@ -91,14 +133,46 @@ function certificationStatus(expiry: string): "valid" | "expiring" | "expired" {
 }
 
 function toDateInput(value?: string): string {
-  if (!value) return "";
-  const [day, month, year] = value.split("/");
-  return year && month && day ? `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}` : "";
+  return toDateInputValue(value);
 }
 
 function fromDateInput(value: string): string {
-  if (!value) return "";
-  return new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR");
+  return value;
+}
+
+function validateBrigadierForm(form: Partial<CreateBrigadierDto>, isEditing: boolean): string | null {
+  const requiredFields: Array<[keyof CreateBrigadierDto, string]> = [
+    ["name", "nome completo"],
+    ["apartment", "apartamento"],
+    ["block", "bloco"],
+    ["phone", "telefone"],
+    ["role", "funcao"],
+    ["certificationDate", "data da certificacao"],
+    ["certificationExpiry", "vencimento da certificacao"],
+    ["certificationBody", "orgao certificador"],
+  ];
+
+  for (const [field, label] of requiredFields) {
+    if (!String(form[field] ?? "").trim()) {
+      return `Informe o ${label}.`;
+    }
+  }
+
+  const certificationDate = parseDate(form.certificationDate);
+  const certificationExpiry = parseDate(form.certificationExpiry);
+  if (!certificationDate || !certificationExpiry) {
+    return "Informe datas de certificacao validas.";
+  }
+
+  if (certificationExpiry.getTime() < certificationDate.getTime()) {
+    return "O vencimento da certificacao deve ser igual ou posterior a data da certificacao.";
+  }
+
+  if (!isEditing && form.active === undefined) {
+    return "Informe se o brigadista esta ativo.";
+  }
+
+  return null;
 }
 
 export function BrigadiersPage() {
@@ -109,7 +183,9 @@ export function BrigadiersPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showNotifyModal, setShowNotifyModal] = useState(false);
   const [editingBr, setEditingBr] = useState<Brigadier | null>(null);
-  const [form, setForm] = useState<Partial<CreateBrigadierDto>>({ role: "Brigadista", active: true });
+  const [form, setForm] = useState<Partial<CreateBrigadierDto>>(defaultBrigadierForm);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [notifyChannel, setNotifyChannel] = useState<NotificationChannel>("whatsapp");
   const [notifyMessage, setNotifyMessage] = useState("");
   const [sentLog, setSentLog] = useState<NotificationLog | null>(null);
@@ -172,25 +248,54 @@ export function BrigadiersPage() {
 
   const openCreate = () => {
     setEditingBr(null);
-    setForm({ role: "Brigadista", active: true });
+    setForm(defaultBrigadierForm);
+    setFormError(null);
     setShowAddModal(true);
   };
 
   const openEdit = (brigadier: Brigadier) => {
     setEditingBr(brigadier);
-    setForm({ ...brigadier });
+    setForm(brigadierToForm(brigadier));
+    setFormError(null);
     setShowAddModal(true);
   };
 
   const handleSave = async () => {
-    if (editingBr) {
-      await update(editingBr.id, form as UpdateBrigadierDto);
-    } else {
-      await create(form as CreateBrigadierDto);
+    const validationError = validateBrigadierForm(form, !!editingBr);
+    if (validationError) {
+      setFormError(validationError);
+      return;
     }
-    setShowAddModal(false);
-    setEditingBr(null);
-    setForm({ role: "Brigadista", active: true });
+
+    setIsSaving(true);
+    setFormError(null);
+    try {
+      const normalizedForm = {
+        name: form.name?.trim(),
+        apartment: form.apartment?.trim(),
+        block: form.block?.trim() || "A",
+        phone: formatPhone(form.phone),
+        role: form.role,
+        certificationDate: form.certificationDate,
+        certificationExpiry: form.certificationExpiry,
+        certificationBody: form.certificationBody?.trim(),
+        active: form.active,
+        observations: form.observations,
+      };
+
+      if (editingBr) {
+        await update(editingBr.id, normalizedForm as UpdateBrigadierDto);
+      } else {
+        await create({ ...defaultBrigadierForm, ...normalizedForm } as CreateBrigadierDto);
+      }
+      setShowAddModal(false);
+      setEditingBr(null);
+      setForm(defaultBrigadierForm);
+    } catch (err) {
+      setFormError((err as Error).message || "Nao foi possivel salvar o brigadista.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -307,7 +412,7 @@ export function BrigadiersPage() {
                           <span className="text-sm text-gray-600">Apto {brigadier.apartment} - Bl. {brigadier.block}</span>
                         </td>
                         <td className="px-5 py-4 hidden sm:table-cell">
-                          <span className="text-sm text-gray-600">{brigadier.phone}</span>
+                          <span className="text-sm text-gray-600">{formatPhone(brigadier.phone)}</span>
                         </td>
                         <td className="px-5 py-4">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${roleColors[brigadier.role]}`}>
@@ -370,8 +475,15 @@ export function BrigadiersPage() {
                           <span className="text-sm font-medium text-gray-900">
                             {log.channel === "whatsapp" ? "WhatsApp" : "SMS"} - {log.recipients.length} destinatario(s)
                           </span>
-                          <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border", log.status === "sent" ? "bg-green-100 text-green-700 border-green-200" : "bg-red-100 text-red-700 border-red-200")}>
-                            {log.status === "sent" ? <><Check className="w-3 h-3" /> Enviado</> : "Falhou"}
+                          <span className={cn(
+                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border",
+                            log.status === "sent"
+                              ? "bg-green-100 text-green-700 border-green-200"
+                              : log.status === "queued"
+                                ? "bg-blue-100 text-blue-700 border-blue-200"
+                                : "bg-red-100 text-red-700 border-red-200",
+                          )}>
+                            {log.status === "sent" ? <><Check className="w-3 h-3" /> Enviado</> : log.status === "queued" ? "Na fila" : "Falhou"}
                           </span>
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{log.message}</p>
@@ -396,6 +508,9 @@ export function BrigadiersPage() {
               <Megaphone className="w-5 h-5 text-blue-600" />
               Enviar notificacao
             </DialogTitle>
+            <DialogDescription>
+              Envie uma mensagem pelos canais registrados no backend para os brigadistas selecionados.
+            </DialogDescription>
           </DialogHeader>
 
           {sentLog ? (
@@ -493,8 +608,10 @@ export function BrigadiersPage() {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingBr ? "Editar brigadista" : "Cadastrar brigadista"}</DialogTitle>
+            <DialogDescription className="sr-only">Cadastro de brigadista.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
+            {formError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</div>}
             <div className="space-y-1.5">
               <Label>Nome completo *</Label>
               <Input placeholder="Nome do brigadista" value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -505,14 +622,20 @@ export function BrigadiersPage() {
                 <Input placeholder="101" value={form.apartment ?? ""} onChange={(e) => setForm({ ...form, apartment: e.target.value })} />
               </div>
               <div className="space-y-1.5">
-                <Label>Bloco</Label>
+                <Label>Bloco *</Label>
                 <Input placeholder="A" value={form.block ?? ""} onChange={(e) => setForm({ ...form, block: e.target.value })} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Telefone *</Label>
-                <Input placeholder="(11) 99999-0000" value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                <Input
+                  inputMode="numeric"
+                  maxLength={14}
+                  placeholder="(11)99999-0000"
+                  value={form.phone ?? ""}
+                  onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Funcao *</Label>
@@ -528,16 +651,16 @@ export function BrigadiersPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Data da certificacao</Label>
+                <Label>Data da certificacao *</Label>
                 <Input type="date" value={toDateInput(form.certificationDate)} onChange={(e) => setForm({ ...form, certificationDate: fromDateInput(e.target.value) })} />
               </div>
               <div className="space-y-1.5">
-                <Label>Vencimento da cert.</Label>
+                <Label>Vencimento da cert. *</Label>
                 <Input type="date" value={toDateInput(form.certificationExpiry)} onChange={(e) => setForm({ ...form, certificationExpiry: fromDateInput(e.target.value) })} />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Orgao certificador</Label>
+              <Label>Orgao certificador *</Label>
               <Input placeholder="Ex: Corpo de Bombeiros, SESMT..." value={form.certificationBody ?? ""} onChange={(e) => setForm({ ...form, certificationBody: e.target.value })} />
             </div>
             <div className="space-y-1.5">
@@ -550,8 +673,10 @@ export function BrigadiersPage() {
             </div>
           </div>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setShowAddModal(false)}>Cancelar</Button>
-            <Button className="bg-blue-700 hover:bg-blue-800 text-white" onClick={handleSave}>Salvar</Button>
+            <Button variant="outline" onClick={() => setShowAddModal(false)} disabled={isSaving}>Cancelar</Button>
+            <Button className="bg-blue-700 hover:bg-blue-800 text-white" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? "Salvando..." : "Salvar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

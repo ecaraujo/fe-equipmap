@@ -10,7 +10,6 @@ import br.com.equipmap.auth.domain.UserCondominium;
 import br.com.equipmap.auth.repository.UserRepository;
 import br.com.equipmap.auth.security.AuthPrincipal;
 import br.com.equipmap.auth.security.JwtService;
-import br.com.equipmap.core.error.ApiException;
 import br.com.equipmap.core.error.ForbiddenException;
 import br.com.equipmap.core.error.UnauthorizedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
